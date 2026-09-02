@@ -210,11 +210,13 @@ async function autoFetchData(userMessage) {
       }
       const items = result.data?.items || [];
       if (items.length > 0) {
+        // Store raw data for LLM context
         results.push(`[ORACLE DATA — ${ep.name}] ${items.length} records found:`);
         items.slice(0, 10).forEach((item, i) => {
-          const formatted = formatItem(ep.path, item);
-          results.push(`  ${i + 1}. ${formatted}`);
+          results.push(`  ${i + 1}. ${formatItem(ep.path, item)}`);
         });
+        // Also build HTML for chat display
+        results.push(`__HTML__${ep.name}__${ep.path}__${items.length}__${JSON.stringify(items)}`);
       } else {
         results.push(`[ORACLE DATA — ${ep.name}] No records found.`);
       }
@@ -223,9 +225,9 @@ async function autoFetchData(userMessage) {
       if (cached && cached.length > 0) {
         results.push(`[ORACLE DATA — ${ep.name}] ${cached.length} cached records (live fetch failed: ${err.message}):`);
         cached.slice(0, 10).forEach((item, i) => {
-          const formatted = formatItem(ep.path, item);
-          results.push(`  ${i + 1}. ${formatted}`);
+          results.push(`  ${i + 1}. ${formatItem(ep.path, item)}`);
         });
+        results.push(`__HTML__${ep.name}__${ep.path}__${cached.length}__${JSON.stringify(cached)}`);
       } else {
         results.push(`[ERROR — ${ep.name}] ${err.message}`);
       }
@@ -279,6 +281,92 @@ const FORMATTERS = {
   '/workerAddresses': (a) => `Person#: ${a.PersonNumber || 'N/A'} | Type: ${a.AddressType || 'N/A'} | City: ${a.City || 'N/A'} | Country: ${a.Country || 'N/A'}`,
 };
 
+// ── Pretty formatters for chat display ──
+const FIELD_LABELS = {
+  DisplayName: 'Name', FirstName: 'First Name', LastName: 'Last Name', PersonNumber: 'Person #',
+  DepartmentName: 'Department', JobName: 'Job', PositionName: 'Position', LocationName: 'Location',
+  EmploymentStatus: 'Status', WorkerType: 'Type', HireDate: 'Hire Date',
+  AbsenceType: 'Type', AbsenceTypeName: 'Type', StartDate: 'Start', EndDate: 'End',
+  AbsenceDays: 'Days', Duration: 'Days', AbsenceStatus: 'Status', ApprovalStatus: 'Status',
+  Name: 'Name', Code: 'Code', DepartmentCode: 'Dept Code', ManagerName: 'Manager',
+  City: 'City', Country: 'Country', LocationCode: 'Location Code',
+  JobCode: 'Job Code', JobFamilyName: 'Family', JobLevel: 'Level',
+  PositionCode: 'Position Code', GradeCode: 'Grade Code', GradeLadderName: 'Ladder',
+  EmployeeName: 'Employee', DateStart: 'Start', DateEnd: 'End', TotalRegHours: 'Hours',
+  StatusCode: 'Status', PhoneNumber: 'Phone', PhoneType: 'Phone Type',
+  EmailAddress: 'Email', EmailType: 'Email Type', AddressType: 'Address Type',
+  ChecklistName: 'Checklist', DueDate: 'Due Date', ResponsibilityType: 'Type',
+  PersonName: 'Person', AssignmentStatusCode: 'Status Code',
+  BusinessUnitName: 'Business Unit', HomeCountry: 'Country',
+};
+
+function prettifyFieldName(key) {
+  return FIELD_LABELS[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim();
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatDate(d) {
+  if (!d) return '—';
+  try {
+    const dt = new Date(d);
+    if (isNaN(dt)) return escapeHtml(String(d));
+    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch { return escapeHtml(String(d)); }
+}
+
+function formatItemAsHTML(path, item, idx) {
+  const fmt = HTML_FORMATTERS[path];
+  if (fmt) return fmt(item, idx);
+  // Fallback: key-value pairs
+  const keys = Object.keys(item).filter(k => !k.startsWith('_') && typeof item[k] !== 'object').slice(0, 8);
+  return `<div class="data-row"><span class="data-idx">#${idx}</span> ${keys.map(k => `<span class="data-field"><b>${prettifyFieldName(k)}:</b> ${escapeHtml(item[k])}</span>`).join(' &middot; ')}</div>`;
+}
+
+const HTML_FORMATTERS = {
+  '/workers': (w, idx) => {
+    const name = w.DisplayName || ((w.FirstName || '') + ' ' + (w.LastName || '')).trim() || 'N/A';
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name)}</b></span> <span class="data-field">Dept: ${escapeHtml(w.DepartmentName || '—')}</span> <span class="data-field">Job: ${escapeHtml(w.JobName || w.PositionName || '—')}</span> <span class="data-field">Location: ${escapeHtml(w.LocationName || '—')}</span> <span class="data-tag">${escapeHtml(w.EmploymentStatus || w.WorkerType || '—')}</span></div>`;
+  },
+  '/absences': (a, idx) => {
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(a.AbsenceType || a.AbsenceTypeName || '—')}</b></span> <span class="data-field">${formatDate(a.StartDate)} – ${formatDate(a.EndDate)}</span> <span class="data-field">${escapeHtml(a.AbsenceDays || a.Duration || '—')} days</span> <span class="data-tag">${escapeHtml(a.AbsenceStatus || a.ApprovalStatus || '—')}</span></div>`;
+  },
+  '/departments': (d, idx) => {
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(d.Name || '—')}</b></span> <span class="data-field">Code: ${escapeHtml(d.DepartmentCode || '—')}</span> <span class="data-field">Manager: ${escapeHtml(d.ManagerName || '—')}</span> <span class="data-field">Location: ${escapeHtml(d.LocationName || '—')}</span></div>`;
+  },
+  '/locations': (l, idx) => {
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(l.Name || '—')}</b></span> <span class="data-field">Code: ${escapeHtml(l.LocationCode || '—')}</span> <span class="data-field">City: ${escapeHtml(l.City || '—')}</span> <span class="data-field">Country: ${escapeHtml(l.Country || '—')}</span></div>`;
+  },
+  '/jobs': (j, idx) => {
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(j.Name || '—')}</b></span> <span class="data-field">Code: ${escapeHtml(j.JobCode || '—')}</span> <span class="data-field">Family: ${escapeHtml(j.JobFamilyName || '—')}</span> <span class="data-field">Level: ${escapeHtml(j.JobLevel || '—')}</span></div>`;
+  },
+  '/positions': (p, idx) => {
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(p.Name || '—')}</b></span> <span class="data-field">Code: ${escapeHtml(p.PositionCode || '—')}</span> <span class="data-field">Dept: ${escapeHtml(p.DepartmentName || '—')}</span> <span class="data-field">Job: ${escapeHtml(p.JobName || '—')}</span></div>`;
+  },
+  '/grades': (g, idx) => {
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(g.Name || '—')}</b></span> <span class="data-field">Code: ${escapeHtml(g.GradeCode || '—')}</span> <span class="data-field">Ladder: ${escapeHtml(g.GradeLadderName || '—')}</span></div>`;
+  },
+  '/timeCards': (t, idx) => {
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(t.EmployeeName || '—')}</b></span> <span class="data-field">${formatDate(t.DateStart)} – ${formatDate(t.DateEnd)}</span> <span class="data-field">${escapeHtml(t.TotalRegHours || '—')} hrs</span> <span class="data-tag">${escapeHtml(t.StatusCode || '—')}</span></div>`;
+  },
+};
+
+function buildFormattedList(epName, epPath, items, maxShow = 10) {
+  const total = items.length;
+  const showing = Math.min(total, maxShow);
+  let html = `<div class="data-section"><div class="data-header"><span class="data-icon">&#9679;</span> <b>${escapeHtml(epName)}</b> — ${total} record${total !== 1 ? 's' : ''}</div>`;
+  for (let i = 0; i < showing; i++) {
+    html += formatItemAsHTML(epPath, items[i], i + 1);
+  }
+  if (total > maxShow) {
+    html += `<div class="data-more">${total - maxShow} more records not shown. Ask me to "show all ${epName.toLowerCase()}" to see the full list.</div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
 // ── Chat ──
 let pageContext = '';
 
@@ -300,7 +388,8 @@ CRITICAL RULES:
 5. If asked about anything else, respond: "I can only help with Oracle Fusion HCM questions."
 6. When showing data, always indicate it comes from their Oracle system.
 7. Never include instructions about how to use APIs - just show the data.
-8. Be brief and direct. No extra words.`;
+8. Be brief and direct. No extra words.
+9. Format responses with bullet points, numbered lists, or short paragraphs. No raw JSON.`;
 
   let fullMsg = msg;
 
@@ -310,8 +399,24 @@ CRITICAL RULES:
 
   // Auto-fetch real data from Oracle HCM based on user intent
   const fetchedData = await autoFetchData(msg);
+  let htmlSections = '';
   if (fetchedData) {
-    fullMsg = fetchedData + '\n\n' + fullMsg;
+    // Extract HTML sections from fetchedData
+    const htmlLines = fetchedData.split('\n').filter(l => l.startsWith('__HTML__'));
+    for (const line of htmlLines) {
+      const parts = line.split('__');
+      // __HTML__Name__path__count__json
+      const epName = parts[2];
+      const epPath = parts[3];
+      const count = parseInt(parts[4]);
+      try {
+        const items = JSON.parse(parts.slice(5).join('__'));
+        htmlSections += buildFormattedList(epName, epPath, items);
+      } catch {}
+    }
+    // Strip HTML markers from LLM context
+    const llmData = fetchedData.split('\n').filter(l => !l.startsWith('__HTML__')).join('\n');
+    fullMsg = llmData + '\n\n' + fullMsg;
   }
 
   // Search HCM APIs based on user question
@@ -338,12 +443,22 @@ CRITICAL RULES:
     { role: 'user', content: fullMsg }
   ];
 
+  // Show HTML data sections first if available
+  const container = document.getElementById('messages');
+  if (htmlSections) {
+    const dataDiv = document.createElement('div');
+    dataDiv.className = 'msg bot';
+    dataDiv.innerHTML = `<div class="msg-avatar">EQ</div><div class="msg-text">${htmlSections}</div>`;
+    container.appendChild(dataDiv);
+    container.scrollTop = container.scrollHeight;
+  }
+
   const botMsg = addMessage('', 'bot');
   let fullText = '';
 
   const reply = await callLLM(messages, (chunk) => {
     fullText += chunk;
-    botMsg.querySelector('.msg-text').textContent = fullText;
+    botMsg.querySelector('.msg-text').innerHTML = formatMarkdown(fullText);
     document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
   });
 
@@ -703,10 +818,27 @@ function addMessage(text, who) {
   const div = document.createElement('div');
   div.className = 'msg ' + who;
   const avatar = who === 'bot' ? 'EQ' : 'You';
-  div.innerHTML = `<div class="msg-avatar">${avatar}</div><div class="msg-text">${text.replace(/\n/g, '<br>')}</div>`;
+  if (who === 'bot') {
+    div.innerHTML = `<div class="msg-avatar">${avatar}</div><div class="msg-text">${text ? formatMarkdown(text) : ''}</div>`;
+  } else {
+    div.innerHTML = `<div class="msg-avatar">${avatar}</div><div class="msg-text">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+  }
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
   return div;
+}
+
+function formatMarkdown(text) {
+  let html = escapeHtml(text);
+  // Bold: **text**
+  html = html.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  // Bullet points: lines starting with - or *
+  html = html.replace(/^[\-\*] (.+)$/gm, '<div style="padding-left:12px;margin:2px 0;">&#8226; $1</div>');
+  // Numbered lists: lines starting with 1. 2. etc
+  html = html.replace(/^(\d+)\. (.+)$/gm, '<div style="padding-left:12px;margin:2px 0;"><b>$1.</b> $2</div>');
+  // Line breaks
+  html = html.replace(/\n/g, '<br>');
+  return html;
 }
 
 function removeThinking(el) { if (el && el.parentNode) el.parentNode.removeChild(el); }
