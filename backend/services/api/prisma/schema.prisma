@@ -90,3 +90,14 @@ model PersonDataCache {
   @@unique([userId, resourcePath])
   @@index([expiresAt])
 }
+
+model TelemetryEvent {
+  id         String   @id @default(uuid())
+  tenantId   String
+  userId     String
+  name       String
+  properties Json
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, name])
+}
