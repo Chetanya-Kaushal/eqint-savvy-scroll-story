@@ -1,0 +1,27 @@
+{
+  "name": "@savvy/api",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:generate": "prisma generate"
+  },
+  "dependencies": {
+    "fastify": "^4.28.0",
+    "@prisma/client": "^5.20.0",
+    "openid-client": "^5.6.5",
+    "jsonwebtoken": "^9.0.2",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "prisma": "^5.20.0",
+    "typescript": "^5.6.0",
+    "tsx": "^4.19.0",
+    "vitest": "^2.1.0",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^20.16.0",
+    "light-my-request": "^5.13.0"
+  }
+}

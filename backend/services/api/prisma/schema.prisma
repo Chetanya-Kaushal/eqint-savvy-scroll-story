@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id                String            @id @default(uuid())
+  name              String
+  oracleBaseUrl     String
+  oracleServiceUser String?
+  oracleServicePass String?
+  createdAt         DateTime          @default(now())
+  users             User[]
+  referenceRecords  ReferenceRecord[]
+  auditLogs         AuditLog[]
+}
+
+model User {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  email      String
+  role       String
+  ssoSubject String   @unique
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model PlatformAdmin {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model ReferenceRecord {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  category   String
+  externalId String
+  data       Json
+  syncedAt   DateTime @default(now())
+
+  @@index([tenantId, category])
+  @@unique([tenantId, category, externalId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+  actor     String
+  action    String
+  scope     String
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}

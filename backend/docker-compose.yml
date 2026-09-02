@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: savvy
+      POSTGRES_PASSWORD: savvy_dev_password
+      POSTGRES_DB: savvy
+    ports:
+      - "5432:5432"
+    volumes:
+      - savvy_pg_data:/var/lib/postgresql/data
+volumes:
+  savvy_pg_data:
