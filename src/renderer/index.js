@@ -1,5 +1,6 @@
 const { HCMDiscovery } = require('./hcm-discovery');
 const { classifyOracleError } = require('./access-control');
+const { detectPersonNumber } = require('./person-query-parser');
 
 let settings = {
   ollamaUrl: 'http://localhost:11434',
@@ -239,14 +240,10 @@ async function autoFetchData(userMessage) {
     }, endpoints);
   }
 
-  // Step 2: Detect Person Number (alphanumeric like NM290, or pure numeric)
-  let personNumber = null;
-  const pnMatch = msg.match(/person\s*(?:number|#|no\.?)\s*([A-Za-z0-9]+)/i)
-    || msg.match(/\b([A-Z]{2,}\d{2,})\b/)
-    || msg.match(/\b(\d{4,})\b/);
-  if (pnMatch) {
-    personNumber = pnMatch[1].toUpperCase();
-  }
+  // Step 2: Detect Person Number (alphanumeric like NM290, or pure numeric) — must run
+  // against the ORIGINAL message (not the lowercased `msg`), since alphanumeric codes
+  // carry meaningful uppercase letters, and must not require the literal word "number".
+  const personNumber = detectPersonNumber(userMessage);
 
   // Step 3: Detect person name in query
   let personName = null;
@@ -354,15 +351,21 @@ async function fetchDataForPerson(person, endpoints) {
         items.slice(0, 10).forEach((item, i) => {
           results.push(`  ${i + 1}. ${formatItem(ep.path, item)}`);
         });
-        // Include full raw data for the LLM to answer specific questions
-        results.push(`[FULL DATA — ${label}]:`);
-        items.slice(0, 10).forEach((item, i) => {
-          const clean = {};
-          for (const [k, v] of Object.entries(item)) {
-            if (!k.startsWith('_') && typeof v !== 'object' && v !== null && v !== '') clean[k] = v;
-          }
-          results.push(`  ${i + 1}. ${JSON.stringify(clean)}`);
-        });
+        // Include full raw field data only when a specific person was resolved — that's
+        // the only case where the LLM needs record-level detail to answer a specific
+        // question (e.g. "what is their department"). For generic multi-record listings,
+        // the formatted card above is the answer; dumping raw JSON for many records
+        // risks a small local model echoing a fragment of it back verbatim.
+        if (person) {
+          results.push(`[FULL DATA — ${label}]:`);
+          items.slice(0, 10).forEach((item, i) => {
+            const clean = {};
+            for (const [k, v] of Object.entries(item)) {
+              if (!k.startsWith('_') && typeof v !== 'object' && v !== null && v !== '') clean[k] = v;
+            }
+            results.push(`  ${i + 1}. ${JSON.stringify(clean)}`);
+          });
+        }
         results.push(`__HTML__${label}__${ep.path}__${items.length}__${JSON.stringify(items)}`);
       } else {
         results.push(`[ORACLE DATA — ${label}] No records found.`);
@@ -459,8 +462,56 @@ function formatDate(d) {
 const { pickDisplayLabel } = require('./name-resolver');
 
 function formatItemAsHTML(path, item, idx) {
-  const label = pickDisplayLabel(item) || '—';
+  const label = pickDisplayLabel(item) || 'Team member';
   return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(label)}</b></span></div>`;
+}
+
+// Whitelisted personal/employment fields for the friendly single-person profile
+// view. Deliberately a whitelist, not a blacklist — this is the only way to
+// guarantee an internal ID field can never slip through, since a blacklist would
+// only be as good as the list of ID-shaped patterns someone remembered to exclude.
+const PERSON_PROFILE_FIELDS = [
+  { key: 'EmailAddress', label: 'Email', section: 'personal' },
+  { key: 'PhoneNumber', label: 'Phone', section: 'personal' },
+  { key: 'DateOfBirth', label: 'Birthday', section: 'personal', isDate: true },
+  { key: 'HomeCountry', label: 'Country', section: 'personal' },
+  { key: 'JobName', label: 'Job title', section: 'employment' },
+  { key: 'PositionName', label: 'Position', section: 'employment' },
+  { key: 'DepartmentName', label: 'Department', section: 'employment' },
+  { key: 'LocationName', label: 'Location', section: 'employment' },
+  { key: 'ManagerName', label: 'Manager', section: 'employment' },
+  { key: 'HireDate', label: 'Started on', section: 'employment', isDate: true },
+  { key: 'EmploymentStatus', label: 'Status', section: 'employment' },
+  { key: 'WorkerType', label: 'Employment type', section: 'employment' },
+];
+
+function buildPersonProfileHTML(item) {
+  const name = pickDisplayLabel(item) || 'Team member';
+  const personalRows = [];
+  const employmentRows = [];
+  for (const field of PERSON_PROFILE_FIELDS) {
+    const raw = item[field.key];
+    if (raw === undefined || raw === null || raw === '') continue;
+    const value = field.isDate ? formatDate(raw) : escapeHtml(String(raw));
+    const row = `<div class="data-row"><span class="data-field-label">${escapeHtml(field.label)}</span><span class="data-field">${value}</span></div>`;
+    (field.section === 'personal' ? personalRows : employmentRows).push(row);
+  }
+  let html = `<div class="data-section"><div class="data-header"><span class="data-icon">&#9679;</span> <b>${escapeHtml(name)}</b></div>`;
+  if (personalRows.length) html += `<div class="data-subheader">Personal details</div>${personalRows.join('')}`;
+  if (employmentRows.length) html += `<div class="data-subheader">Work details</div>${employmentRows.join('')}`;
+  if (!personalRows.length && !employmentRows.length) html += `<div class="data-row">No additional details are available for this person.</div>`;
+  html += '</div>';
+  return html;
+}
+
+// Shows a friendly one-person profile card when exactly one Workers record is
+// being displayed, and the plain numbered list for everything else (multi-record
+// lists, other endpoint types).
+function renderDataBlock(epName, epPath, items) {
+  if (epPath === '/workers' && items.length === 1) {
+    return buildPersonProfileHTML(items[0]);
+  }
+  return buildFormattedList(epName, epPath, items);
 }
 
 const HTML_FORMATTERS = {
@@ -469,7 +520,7 @@ const HTML_FORMATTERS = {
     return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name || '—')}</b></span></div>`;
   },
   '/workers': (w, idx) => {
-    const name = pickDisplayLabel(w) || '?';
+    const name = pickDisplayLabel(w) || 'Team member';
     return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name)}</b></span></div>`;
   },
   '/absences': (a, idx) => {
@@ -574,9 +625,10 @@ CRITICAL RULES:
 6. When showing data, always indicate it comes from their Oracle system.
 7. Never include instructions about how to use APIs - just show the data.
 8. Be brief and direct. No extra words.
-9. Format responses with bullet points, numbered lists, or short paragraphs. No raw JSON.
-10. ALWAYS show person names, never show raw IDs like PersonId or PersonNumber in your response.
-11. Use the full data provided to answer specific questions (department, job, location, etc.).`;
+9. NEVER output raw JSON, curly braces, or anything that looks like code. If you catch yourself about to write "{", stop and rephrase the same information as a short sentence or bullet point instead.
+10. NEVER show any ID number, code, or system field name (PersonId, PersonNumber, AssignmentId, etc.) anywhere in your response. If a name is not available, say "this person" instead of showing an ID.
+11. Use the full data provided to answer specific questions (department, job, location, etc.).
+12. Write for someone with zero technical background - plain, everyday words only. No field names, no technical terms, no jargon. Explain things the way you'd explain them to a curious child: simply and warmly.`;
 
   let fullMsg = msg;
 
@@ -620,7 +672,7 @@ CRITICAL RULES:
             const parts = line.split('__');
             try {
               const items = JSON.parse(parts.slice(5).join('__'));
-              html += buildFormattedList(parts[2], parts[3], items);
+              html += renderDataBlock(parts[2], parts[3], items);
             } catch {}
           }
           if (html) {
@@ -631,7 +683,7 @@ CRITICAL RULES:
           }
           const llmText = result.text.split('\n').filter(l => !l.startsWith('__HTML__')).join('\n');
           const botMsg = addMessage('', 'bot');
-          const sysPrompt2 = 'You are Savvy, an Oracle Fusion HCM assistant. Use the full data provided to answer. Always show person names, never raw IDs. Be brief.';
+          const sysPrompt2 = 'You are Savvy, an Oracle Fusion HCM assistant. Use the full data provided to answer. Never show ID numbers, codes, or field names - use plain, everyday language a non-technical person would understand. Be brief.';
           const recentHist2 = conversationHistory.slice(-10).map(h => ({ role: h.role === 'bot' ? 'assistant' : 'user', content: h.content }));
           let selectionText = '';
           const reply = await callLLM([{ role: 'system', content: sysPrompt2 }, ...recentHist2, { role: 'user', content: llmText }], (chunk) => {
@@ -682,7 +734,7 @@ CRITICAL RULES:
       const parts = line.split('__');
       try {
         const items = JSON.parse(parts.slice(5).join('__'));
-        htmlSections += buildFormattedList(parts[2], parts[3], items);
+        htmlSections += renderDataBlock(parts[2], parts[3], items);
       } catch {}
     }
     const llmData = fetchedData.text.split('\n').filter(l => !l.startsWith('__HTML__')).join('\n');

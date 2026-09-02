@@ -12,9 +12,9 @@ describe('pickDisplayLabel', () => {
     expect(pickDisplayLabel(item)).toBe('Jane Smith');
   });
 
-  it('only falls back to an ID/code/number field when no name-like field exists at all', () => {
-    const item = { PersonId: '300000009119721', AssignmentStatusCode: 'ACTIVE' };
-    expect(pickDisplayLabel(item)).toBe('300000009119721');
+  it('never falls back to an ID/code/number field — returns null instead so the caller can show a friendly placeholder', () => {
+    const item = { PersonId: '300000009119721', PersonNumber: 'NM1658', AssignmentStatusCode: 'ACTIVE' };
+    expect(pickDisplayLabel(item)).toBe(null);
   });
 
   it('returns null for an item with no usable fields', () => {
