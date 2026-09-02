@@ -18,6 +18,7 @@ model Tenant {
   oidcRedirectUri              String?
   oidcTokenExchangeClientId    String?
   oidcTokenExchangeClientSecret String?
+  retentionDays                Int          @default(365)
   createdAt                    DateTime          @default(now())
   users                        User[]
   referenceRecords             ReferenceRecord[]

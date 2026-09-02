@@ -16,9 +16,10 @@ export function registerTenantAdminRoutes(server: FastifyInstance): void {
         return reply.code(403).send({ error: 'Cannot modify a different tenant' });
       }
 
-      const data: Record<string, string> = { oracleBaseUrl: request.body.oracleBaseUrl };
+      const data: Record<string, any> = { oracleBaseUrl: request.body.oracleBaseUrl };
       if (request.body.oracleServiceUser) data.oracleServiceUser = request.body.oracleServiceUser;
       if (request.body.oracleServicePass) data.oracleServicePass = await encryptField(kmsProvider, request.body.oracleServicePass);
+      if (request.body.retentionDays != null) data.retentionDays = request.body.retentionDays;
 
       const tenant = await prisma.tenant.update({ where: { id: request.params.tenantId }, data });
       await writeAuditLog({ tenantId: tenant.id, actor: session.userId, action: 'oracle_connection_updated', scope: 'tenant_admin' });
