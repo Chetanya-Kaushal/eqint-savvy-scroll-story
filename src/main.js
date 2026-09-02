@@ -250,6 +250,11 @@ ipcMain.handle('save-conversation-history', (e, history) => {
   } catch (err) { console.error('Failed to save conversation history:', err); return false; }
 });
 
+const { loginWithSso, getAuthState, logout } = require('./main/auth');
+ipcMain.handle('login-with-sso', (e, { backendUrl, tenantId }) => loginWithSso(backendUrl, tenantId));
+ipcMain.handle('get-auth-state', () => getAuthState());
+ipcMain.handle('logout', () => logout());
+
 const ALLOWED_UI_KEYS = ['isBubbleMode', 'isCollapsed', 'overlayWidth', 'overlayHeight', 'overlayX', 'overlayY'];
 ipcMain.handle('get-ui-state', (e, key) => ALLOWED_UI_KEYS.includes(key) ? store.get(key) : null);
 ipcMain.handle('set-ui-state', (e, { key, value }) => {

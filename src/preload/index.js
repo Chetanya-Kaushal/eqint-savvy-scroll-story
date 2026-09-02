@@ -17,6 +17,9 @@ contextBridge.exposeInMainWorld('savvy', {
   saveHcmData: (data) => ipcRenderer.invoke('save-hcm-data', data),
   getConversationHistory: () => ipcRenderer.invoke('get-conversation-history'),
   saveConversationHistory: (history) => ipcRenderer.invoke('save-conversation-history', history),
+  loginWithSso: (backendUrl, tenantId) => ipcRenderer.invoke('login-with-sso', { backendUrl, tenantId }),
+  getAuthState: () => ipcRenderer.invoke('get-auth-state'),
+  logout: () => ipcRenderer.invoke('logout'),
   getUiState: (key) => ipcRenderer.invoke('get-ui-state', key),
   setUiState: (key, value) => ipcRenderer.invoke('set-ui-state', key, value),
 });

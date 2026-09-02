@@ -14,7 +14,9 @@
   "author": "EQInt",
   "license": "MIT",
   "dependencies": {
-    "electron-store": "^8.1.0"
+    "electron-store": "^8.1.0",
+    "keytar": "^7.9.0",
+    "openid-client": "^6.8.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
