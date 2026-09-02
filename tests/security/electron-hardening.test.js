@@ -14,3 +14,15 @@ test('renderer has no direct Node access (contextIsolation + no nodeIntegration)
 
   await app.close();
 });
+
+test('page declares a restrictive Content-Security-Policy', async () => {
+  const app = await electron.launch({ args: [path.join(__dirname, '..', '..', 'src', 'main.js')] });
+  const window = await app.firstWindow();
+
+  const csp = await window.evaluate(() =>
+    document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content || null
+  );
+  expect(csp).toContain("script-src 'self'");
+
+  await app.close();
+});

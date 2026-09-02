@@ -205,6 +205,15 @@ ipcMain.handle('move-overlay-to-corner', () => {
 });
 
 app.whenReady().then(() => {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': ["default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:11434 http://127.0.0.1:11434"],
+      },
+    });
+  });
+
   createOverlay();
   createTray();
 

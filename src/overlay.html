@@ -2,6 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:11434 http://127.0.0.1:11434">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body {
@@ -323,7 +324,7 @@ body {
 <body>
 <div id="app">
   <div id="titlebar">
-    <div class="logo"><img src="../assets/icon.png" alt="EQInt" onerror="this.style.display='none';this.parentNode.innerHTML='<span style=\'font-weight:700;font-size:12px;\'>EQ</span>'" /></div>
+    <div class="logo"><img src="../assets/icon.png" alt="EQInt" class="brand-icon" data-fallback-size="12px" data-fallback-color="inherit" /></div>
     <div class="info">
       <div class="name">Savvy</div>
       <div class="status" id="status">Ready</div>
@@ -430,7 +431,7 @@ body {
     <div class="cloud cloud-2"></div>
     <div class="cloud cloud-3"></div>
     <div class="moon">
-      <img src="../assets/icon.png" alt="EQInt" onerror="this.style.display='none';this.parentNode.innerHTML='<span style=\'font-weight:700;font-size:16px;color:white;\'>EQ</span>'" />
+      <img src="../assets/icon.png" alt="EQInt" class="brand-icon" data-fallback-size="16px" data-fallback-color="white" />
     </div>
     <div class="sparkle sparkle-1"></div>
     <div class="sparkle sparkle-2"></div>
