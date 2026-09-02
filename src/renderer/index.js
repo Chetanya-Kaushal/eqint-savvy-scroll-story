@@ -839,6 +839,28 @@ CRITICAL RULES:
     return;
   }
 
+  // Handle a data-fetch that ran but produced no actual record — every queried
+  // endpoint either found zero records or was denied. Same reasoning as the
+  // no-data/text handlers above: show what's actually known plainly instead of
+  // handing bare status lines ("No records found.", "[NO ACCESS]") to the LLM as
+  // free-form "context" — observed live, a small local model doesn't relay that
+  // honestly, it invents a plausible-sounding but fabricated permissions/privacy
+  // refusal instead (e.g. for "Show my employment details" against a real
+  // self-service account whose employee-list query simply found nothing).
+  if (fetchedData.type === 'data' && fetchedData.results && !fetchedData.text.includes('__HTML__')) {
+    const friendly = fetchedData.results
+      .map(line => line
+        .replace(/^\[NO ACCESS — [^\]]+\]\s*/, '')
+        .replace(/^\[ORACLE DATA — ([^\]]+)\]\s*No records found\.$/, 'No $1 information was found on file.')
+        .replace(/^\[ERROR — [^\]]+\]\s*/, 'Something went wrong looking that up: '))
+      .join(' ');
+    addMessage(friendly || "I couldn't find anything on file for that right now.", 'bot');
+    conversationHistory.push({ role: 'user', content: msg, timestamp: Date.now() });
+    conversationHistory.push({ role: 'bot', content: friendly, timestamp: Date.now() });
+    try { await window.savvy.saveConversationHistory(conversationHistory.slice(-100)); } catch {}
+    return;
+  }
+
   // Handle data
   let htmlSections = '';
   if (fetchedData && fetchedData.text) {
