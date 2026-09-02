@@ -435,7 +435,8 @@ const FORMATTERS = {
   '/positions': (p) => `Name: ${p.Name || 'N/A'} | Dept: ${p.DepartmentName || ''} | Job: ${p.JobName || ''}`,
   '/grades': (g) => `Name: ${g.Name || 'N/A'} | Ladder: ${g.GradeLadderName || ''}`,
   '/timeRecords': (t) => `Employee: ${t.EmployeeName || t.WorkerName || 'N/A'} | Hours: ${t.TotalRegHours || t.Hours || 'N/A'} | Status: ${t.StatusCode || t.Status || ''}`,
-  '/payrollRelationships': (p) => `Name: ${p.EmployeeName || 'N/A'} | Status: ${p.Status || ''}`,
+  '/payrollRelationships': (p) => `Payroll relationship since: ${p.StartDate || 'N/A'} | Country: ${p.Country || ''}`,
+  '/salaries': (s) => `Amount: ${s.SalaryAmount != null ? s.SalaryAmount + ' ' + (s.CurrencyCode || '') : 'N/A'} | From: ${s.DateFrom || 'N/A'} | Action: ${s.ActionName || ''}`,
   '/allocatedChecklists': (c) => `Name: ${c.ChecklistName || 'N/A'} | Status: ${c.Status || ''} | Due: ${c.DueDate || ''}`,
   '/areasOfResponsibility': (r) => `Type: ${r.ResponsibilityType || 'N/A'} | Person: ${r.PersonName || ''}`,
   '/assignmentStatuses': (s) => `Name: ${s.Name || 'N/A'}`,
@@ -576,6 +577,19 @@ const HTML_FORMATTERS = {
     const date = p.PaymentDate || '';
     return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(amount)}</b></span> <span class="data-field">${formatDate(date)}</span></div>`;
   },
+  '/salaries': (s, idx) => {
+    const amount = s.SalaryAmount != null ? `${s.SalaryAmount.toLocaleString()} ${s.CurrencyCode || ''}`.trim() : 'Salary';
+    const freq = s.FrequencyName ? ` / ${s.FrequencyName.toLowerCase()}` : '';
+    const detailParts = [];
+    if (s.DateFrom) detailParts.push(`from ${formatDate(s.DateFrom)}`);
+    if (s.ActionName) detailParts.push(s.ActionName);
+    const detail = detailParts.join(' — ');
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(amount + freq)}</b></span>${detail ? ` <span class="data-field">${escapeHtml(detail)}</span>` : ''}</div>`;
+  },
+  '/payrollRelationships': (p, idx) => {
+    const label = p.StartDate ? `Payroll relationship since ${formatDate(p.StartDate)}` : 'Payroll relationship';
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(label)}</b></span>${p.Country ? ` <span class="data-field">${escapeHtml(p.Country)}</span>` : ''}</div>`;
+  },
 };
 
 const SUGGESTIONS = {
@@ -659,7 +673,11 @@ CRITICAL RULES:
 9. NEVER output raw JSON, curly braces, or anything that looks like code. If you catch yourself about to write "{", stop and rephrase the same information as a short sentence or bullet point instead.
 10. NEVER show any ID number, code, or system field name (PersonId, PersonNumber, AssignmentId, etc.) anywhere in your response. If a name is not available, say "this person" instead of showing an ID.
 11. Use the full data provided to answer specific questions (department, job, location, etc.).
-12. Write for someone with zero technical background - plain, everyday words only. No field names, no technical terms, no jargon. Explain things the way you'd explain them to a curious child: simply and warmly.`;
+12. Write for someone with zero technical background - plain, everyday words only. No field names, no technical terms, no jargon. Explain things the way you'd explain them to a curious child: simply and warmly.
+13. Keep each person's/record's facts strictly separate. Never blend a detail from one data block with a name or record from a different block, and never let a system field like CreatedBy or LastUpdatedBy (an audit trail of who touched the record, not who it's about) be mistaken for the actual person the record is about.
+14. Conversation history is context, not a license to improvise. If an earlier turn mentioned a person, only reuse that identity for a follow-up ("his", "her", "their", "that person") if it's genuinely unambiguous from the immediately preceding exchange. If it's been several turns, the topic has shifted, or more than one person was discussed, do not guess who a pronoun refers to - ask "Which person do you mean - by name or employee number?" instead of picking one.
+15. If the data needed to answer isn't in front of you - not fetched, not in this conversation, not in [HCM KNOWLEDGE] - say plainly that you don't have that information right now. A confident-sounding guess is a worse answer than an honest "I don't have that on file."
+16. Before answering, silently check: is every specific fact I'm about to state (a name, a date, an amount, a status) traceable to a block actually shown above? If any single fact fails that check, cut it or replace it with "I don't have that on file" - do not soften a fabrication into "maybe" or "it looks like" instead of removing it.`;
 
   let fullMsg = msg;
 
