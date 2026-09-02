@@ -400,18 +400,41 @@ function formatDate(d) {
 function formatItemAsHTML(path, item, idx) {
   const fmt = HTML_FORMATTERS[path];
   if (fmt) return fmt(item, idx);
-  // Fallback: key-value pairs
-  const keys = Object.keys(item).filter(k => !k.startsWith('_') && typeof item[k] !== 'object').slice(0, 8);
+  // Fallback: show first 4 non-object, non-underscore fields
+  const keys = Object.keys(item).filter(k => !k.startsWith('_') && typeof item[k] !== 'object').slice(0, 4);
+  if (keys.length === 0) {
+    // Last resort: show raw JSON preview
+    const raw = JSON.stringify(item).slice(0, 120);
+    return `<div class="data-row"><span class="data-idx">#${idx}</span> <span class="data-field">${escapeHtml(raw)}...</span></div>`;
+  }
   return `<div class="data-row"><span class="data-idx">#${idx}</span> ${keys.map(k => `<span class="data-field"><b>${prettifyFieldName(k)}:</b> ${escapeHtml(item[k])}</span>`).join(' &middot; ')}</div>`;
 }
 
 const HTML_FORMATTERS = {
   '/workers': (w, idx) => {
-    const name = w.DisplayName || ((w.FirstName || '') + ' ' + (w.LastName || '')).trim() || 'N/A';
-    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name)}</b></span> <span class="data-field">Dept: ${escapeHtml(w.DepartmentName || '—')}</span> <span class="data-field">Job: ${escapeHtml(w.JobName || w.PositionName || '—')}</span> <span class="data-field">Location: ${escapeHtml(w.LocationName || '—')}</span> <span class="data-tag">${escapeHtml(w.EmploymentStatus || w.WorkerType || '—')}</span></div>`;
+    const name = w.DisplayName || w.displayName || ((w.FirstName || w.firstName || '') + ' ' + (w.LastName || w.lastName || '')).trim();
+    const dept = w.DepartmentName || w.departmentName || w.Department || '';
+    const job = w.JobName || w.jobName || w.PositionName || w.positionName || '';
+    const loc = w.LocationName || w.locationName || '';
+    const status = w.EmploymentStatus || w.employmentStatus || w.WorkerType || w.workerType || '';
+    if (!name || name === ' ') {
+      // Fallback: show first 4 fields of raw data
+      const keys = Object.keys(w).filter(k => !k.startsWith('_') && typeof w[k] !== 'object').slice(0, 4);
+      return `<div class="data-row"><span class="data-idx">#${idx}</span> ${keys.map(k => `<span class="data-field"><b>${prettifyFieldName(k)}:</b> ${escapeHtml(w[k])}</span>`).join(' &middot; ')}</div>`;
+    }
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name)}</b></span> <span class="data-field">Dept: ${escapeHtml(dept || '—')}</span> <span class="data-field">Job: ${escapeHtml(job || '—')}</span> <span class="data-field">Location: ${escapeHtml(loc || '—')}</span> <span class="data-tag">${escapeHtml(status || '—')}</span></div>`;
   },
   '/absences': (a, idx) => {
-    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(a.AbsenceType || a.AbsenceTypeName || '—')}</b></span> <span class="data-field">${formatDate(a.StartDate)} – ${formatDate(a.EndDate)}</span> <span class="data-field">${escapeHtml(a.AbsenceDays || a.Duration || '—')} days</span> <span class="data-tag">${escapeHtml(a.AbsenceStatus || a.ApprovalStatus || '—')}</span></div>`;
+    const type = a.AbsenceType || a.absenceType || a.AbsenceTypeName || a.absenceTypeName || '';
+    const start = a.StartDate || a.startDate || '';
+    const end = a.EndDate || a.endDate || '';
+    const days = a.AbsenceDays || a.absenceDays || a.Duration || a.duration || '';
+    const status = a.AbsenceStatus || a.absenceStatus || a.ApprovalStatus || a.approvalStatus || '';
+    if (!type && !start) {
+      const keys = Object.keys(a).filter(k => !k.startsWith('_') && typeof a[k] !== 'object').slice(0, 4);
+      return `<div class="data-row"><span class="data-idx">#${idx}</span> ${keys.map(k => `<span class="data-field"><b>${prettifyFieldName(k)}:</b> ${escapeHtml(a[k])}</span>`).join(' &middot; ')}</div>`;
+    }
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(type || '—')}</b></span> <span class="data-field">${formatDate(start)} – ${formatDate(end)}</span> <span class="data-field">${escapeHtml(days || '—')} days</span> <span class="data-tag">${escapeHtml(status || '—')}</span></div>`;
   },
   '/departments': (d, idx) => {
     return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(d.Name || '—')}</b></span> <span class="data-field">Code: ${escapeHtml(d.DepartmentCode || '—')}</span> <span class="data-field">Manager: ${escapeHtml(d.ManagerName || '—')}</span> <span class="data-field">Location: ${escapeHtml(d.LocationName || '—')}</span></div>`;
