@@ -2,6 +2,16 @@ import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import { buildServer } from '../../src/server';
 import { prisma } from '../../src/db';
 import { issueSessionToken } from '../../src/auth/session';
+import { encryptField, KmsProvider } from '../../src/security/field-encryption';
+import { setKmsProvider } from '../../src/security/kms-provider';
+
+function fakeKms(): KmsProvider {
+  const fixedKey = Buffer.alloc(32, 7);
+  return {
+    generateDataKey: async () => ({ plaintextKey: fixedKey, wrappedKey: Buffer.from('wrapped-test-key') }),
+    decryptDataKey: async () => fixedKey,
+  };
+}
 
 describe('data routes', () => {
   let tenantId: string;
@@ -10,7 +20,7 @@ describe('data routes', () => {
 
   beforeEach(async () => {
     process.env.SESSION_JWT_SECRET = 'test-secret';
-    process.env.FIELD_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
+    setKmsProvider(fakeKms());
     await prisma.conversationEntry.deleteMany();
     await prisma.auditLog.deleteMany();
     await prisma.referenceRecord.deleteMany();
@@ -53,18 +63,18 @@ describe('/hcm-proxy/* (native mode)', () => {
 
   beforeEach(async () => {
     process.env.SESSION_JWT_SECRET = 'test-secret';
-    process.env.FIELD_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
+    setKmsProvider(fakeKms());
     await prisma.auditLog.deleteMany();
     await prisma.conversationEntry.deleteMany();
     await prisma.referenceRecord.deleteMany();
     await prisma.user.deleteMany();
     await prisma.tenant.deleteMany();
-    const { encryptField } = await import('../../src/security/field-encryption');
+    const kms = fakeKms();
     const tenant = await prisma.tenant.create({
       data: {
         name: 'Acme', oracleBaseUrl: 'https://acme.example.com',
         oidcIssuerUrl: 'https://idp.acme.test', oidcTokenExchangeClientId: 'x',
-        oidcTokenExchangeClientSecret: encryptField('secret'),
+        oidcTokenExchangeClientSecret: await encryptField(kms, 'secret'),
       },
     });
     tenantId = tenant.id;
@@ -100,17 +110,17 @@ describe('/hcm-proxy/* (degraded fallback mode)', () => {
 
   beforeEach(async () => {
     process.env.SESSION_JWT_SECRET = 'test-secret';
-    process.env.FIELD_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
+    setKmsProvider(fakeKms());
     await prisma.auditLog.deleteMany();
     await prisma.conversationEntry.deleteMany();
     await prisma.referenceRecord.deleteMany();
     await prisma.user.deleteMany();
     await prisma.tenant.deleteMany();
-    const { encryptField } = await import('../../src/security/field-encryption');
+    const kms = fakeKms();
     const tenant = await prisma.tenant.create({
       data: {
         name: 'Acme', oracleBaseUrl: 'https://acme.example.com',
-        oracleServiceUser: 'svc', oracleServicePass: encryptField('svc-pass'),
+        oracleServiceUser: 'svc', oracleServicePass: await encryptField(kms, 'svc-pass'),
       },
     });
     tenantId = tenant.id;

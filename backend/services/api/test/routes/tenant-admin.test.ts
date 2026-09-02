@@ -2,6 +2,16 @@ import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { buildServer } from '../../src/server';
 import { prisma } from '../../src/db';
 import { issueSessionToken } from '../../src/auth/session';
+import { setKmsProvider } from '../../src/security/kms-provider';
+import { KmsProvider } from '../../src/security/field-encryption';
+
+function fakeKms(): KmsProvider {
+  const fixedKey = Buffer.alloc(32, 7);
+  return {
+    generateDataKey: async () => ({ plaintextKey: fixedKey, wrappedKey: Buffer.from('wrapped-test-key') }),
+    decryptDataKey: async () => fixedKey,
+  };
+}
 
 describe('PATCH /tenants/:tenantId/oracle-connection', () => {
   let tenantId: string;
@@ -10,6 +20,7 @@ describe('PATCH /tenants/:tenantId/oracle-connection', () => {
 
   beforeEach(async () => {
     process.env.SESSION_JWT_SECRET = 'test-secret';
+    setKmsProvider(fakeKms());
     await prisma.user.deleteMany();
     await prisma.tenant.deleteMany();
     const tenant = await prisma.tenant.create({ data: { name: 'Acme', oracleBaseUrl: '' } });
@@ -57,6 +68,7 @@ describe('PATCH /tenants/:tenantId/oidc-config', () => {
 
   beforeEach(async () => {
     process.env.SESSION_JWT_SECRET = 'test-secret';
+    setKmsProvider(fakeKms());
     await prisma.user.deleteMany();
     await prisma.tenant.deleteMany();
     const tenant = await prisma.tenant.create({ data: { name: 'Acme', oracleBaseUrl: '' } });

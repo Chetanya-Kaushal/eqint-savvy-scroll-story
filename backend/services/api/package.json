@@ -9,6 +9,7 @@
     "prisma:generate": "prisma generate"
   },
   "dependencies": {
+    "@aws-sdk/client-kms": "^3.1124.0",
     "@prisma/client": "^5.20.0",
     "@types/bcrypt": "^6.0.0",
     "bcrypt": "^6.0.0",

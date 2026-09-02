@@ -3,6 +3,7 @@ import { requireRole } from '../rbac/policy';
 import { prisma } from '../db';
 import { writeAuditLog } from '../audit/log';
 import { encryptField } from '../security/field-encryption';
+import { kmsProvider } from '../security/kms-provider';
 import { SessionClaims } from '../auth/session';
 
 export function registerTenantAdminRoutes(server: FastifyInstance): void {
@@ -17,7 +18,7 @@ export function registerTenantAdminRoutes(server: FastifyInstance): void {
 
       const data: Record<string, string> = { oracleBaseUrl: request.body.oracleBaseUrl };
       if (request.body.oracleServiceUser) data.oracleServiceUser = request.body.oracleServiceUser;
-      if (request.body.oracleServicePass) data.oracleServicePass = encryptField(request.body.oracleServicePass);
+      if (request.body.oracleServicePass) data.oracleServicePass = await encryptField(kmsProvider, request.body.oracleServicePass);
 
       const tenant = await prisma.tenant.update({ where: { id: request.params.tenantId }, data });
       await writeAuditLog({ tenantId: tenant.id, actor: session.userId, action: 'oracle_connection_updated', scope: 'tenant_admin' });
@@ -42,7 +43,7 @@ export function registerTenantAdminRoutes(server: FastifyInstance): void {
 
     const { oidcTokenExchangeClientSecret, ...rest } = request.body;
     const data: Record<string, string> = { ...rest };
-    if (oidcTokenExchangeClientSecret) data.oidcTokenExchangeClientSecret = encryptField(oidcTokenExchangeClientSecret);
+    if (oidcTokenExchangeClientSecret) data.oidcTokenExchangeClientSecret = await encryptField(kmsProvider, oidcTokenExchangeClientSecret);
 
     const tenant = await prisma.tenant.update({ where: { id: request.params.tenantId }, data });
     await writeAuditLog({ tenantId: tenant.id, actor: session.userId, action: 'oidc_config_updated', scope: 'tenant_admin' });

@@ -1,13 +1,22 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import { prisma } from '../../src/db';
 import { exchangeForOracleAccessToken } from '../../src/auth/token-exchange';
-import { encryptField } from '../../src/security/field-encryption';
+import { encryptField, KmsProvider } from '../../src/security/field-encryption';
+import { setKmsProvider } from '../../src/security/kms-provider';
+
+function fakeKms(): KmsProvider {
+  const fixedKey = Buffer.alloc(32, 7);
+  return {
+    generateDataKey: async () => ({ plaintextKey: fixedKey, wrappedKey: Buffer.from('wrapped-test-key') }),
+    decryptDataKey: async () => fixedKey,
+  };
+}
 
 describe('exchangeForOracleAccessToken', () => {
   let tenantId: string;
 
   beforeEach(async () => {
-    process.env.FIELD_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
+    setKmsProvider(fakeKms());
     await prisma.user.deleteMany();
     await prisma.tenant.deleteMany();
   });
@@ -22,10 +31,11 @@ describe('exchangeForOracleAccessToken', () => {
   });
 
   it('exchanges the id_token for an Oracle access token when configured', async () => {
+    const kms = fakeKms();
     const tenant = await prisma.tenant.create({
       data: {
         name: 'Acme', oracleBaseUrl: '', oidcIssuerUrl: 'https://idp.acme.test',
-        oidcTokenExchangeClientId: 'savvy-token-exchange', oidcTokenExchangeClientSecret: encryptField('idp-secret'),
+        oidcTokenExchangeClientId: 'savvy-token-exchange', oidcTokenExchangeClientSecret: await encryptField(kms, 'idp-secret'),
       },
     });
     tenantId = tenant.id;

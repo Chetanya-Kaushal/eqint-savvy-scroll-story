@@ -4,6 +4,7 @@ import { prisma } from '../db';
 import { SessionClaims } from '../auth/session';
 import { exchangeForOracleAccessToken } from '../auth/token-exchange';
 import { decryptField } from '../security/field-encryption';
+import { kmsProvider } from '../security/kms-provider';
 import { writeAuditLog } from '../audit/log';
 
 export function registerDataRoutes(server: FastifyInstance): void {
@@ -43,7 +44,7 @@ export function registerDataRoutes(server: FastifyInstance): void {
     if (accessToken) {
       headers.Authorization = `Bearer ${accessToken}`;
     } else {
-      headers.Authorization = 'Basic ' + Buffer.from(`${tenant.oracleServiceUser}:${decryptField(tenant.oracleServicePass!)}`).toString('base64');
+      headers.Authorization = 'Basic ' + Buffer.from(`${tenant.oracleServiceUser}:${await decryptField(kmsProvider, tenant.oracleServicePass!)}`).toString('base64');
     }
 
     const oracleResponse = await fetch(`${tenant.oracleBaseUrl}/hcmRestApi/resources/11.13.18.05${resourcePath}`, { headers });
