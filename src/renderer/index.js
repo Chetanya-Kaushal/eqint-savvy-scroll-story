@@ -14,6 +14,9 @@ let settings = {
 let currentUserPersonNumber = null; // Set after first worker lookup
 let currentUserPersonId = null;
 let currentUserDisplayName = null;
+// Set when identity resolution was blocked by a permission restriction (403), not
+// because the login genuinely has no linked worker record. See detectCurrentUser().
+let currentUserRequiresNativeScoping = false;
 
 let hcmApis = null;
 let knowledgeBase = [];
@@ -64,24 +67,39 @@ async function loadInitialState() {
   detectCurrentUser();
 }
 
-// Detect current user by matching Oracle username to worker record. Not every Oracle
-// login corresponds to a worker (e.g. an admin/integration account) — in that case this
-// intentionally leaves currentUserPersonNumber unset rather than guessing, so "my"
-// queries can tell the user their login isn't tied to a specific employee record
-// instead of silently showing everyone's data.
+// Detect current user by matching the Oracle login username to a person record.
+//
+// Live-verified: /workers does not support filtering by UserName at all (400 "not
+// valid" on every account tested, admin or self-service) - the correct resource is
+// /userAccounts, which links Username -> PersonId/PersonNumber. But /userAccounts
+// itself requires elevated privileges: a genuine self-service employee login gets 403
+// querying it, even for their own record.
+//
+// Also live-verified: for a real self-service (non-admin) login, calling a resource
+// completely UNFILTERED already returns only that person's own records - Oracle's own
+// row-level security enforces this natively (an unfiltered /absences call for a
+// self-service account returned exactly that person's 5 absences, not everyone's).
+// An admin-level account's unfiltered call, by contrast, returns everyone.
+//
+// So: a 403 on /userAccounts does not mean "not linked to a worker" - it means "this
+// is very likely a genuine self-service account, whose own native Oracle security
+// already scopes unfiltered queries correctly." Only a clean 200-with-zero-items
+// means the login truly has no linked person record.
 async function detectCurrentUser() {
   if (!settings.oracleUrl || !settings.oracleUser) return;
   try {
-    const url = settings.oracleUrl.replace(/\/+$/, '') + `/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&${WORKERS_EXPAND}&effectiveDate=${todayDate()}&q=UserName='` + encodeURIComponent(settings.oracleUser) + '\'&limit=1';
+    const url = settings.oracleUrl.replace(/\/+$/, '') + `/hcmRestApi/resources/11.13.18.05/userAccounts?onlyData=true&fields=PersonId,PersonNumber,Username&q=Username='` + encodeURIComponent(settings.oracleUser) + '\'&limit=1';
     const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
     if (result.ok && result.data?.items?.length > 0) {
-      const me = flattenWorkerItem(result.data.items[0]);
+      const me = result.data.items[0];
       currentUserPersonNumber = me.PersonNumber;
       currentUserPersonId = me.PersonId;
-      currentUserDisplayName = me.DisplayName || ((me.FirstName || '') + ' ' + (me.LastName || '')).trim();
-      console.log('[Savvy] Current user detected:', currentUserDisplayName, '#', currentUserPersonNumber);
+      console.log('[Savvy] Current user detected: #', currentUserPersonNumber);
+    } else if (result.status === 403) {
+      currentUserRequiresNativeScoping = true;
+      console.log('[Savvy] Cannot resolve identity directly (403 on userAccounts) — likely a self-service account. "My" queries will rely on Oracle\'s own native security to scope unfiltered results.');
     } else {
-      console.log('[Savvy] No worker record found for this login — "my" queries will ask for a specific person instead.');
+      console.log('[Savvy] No account/person link found for this login — "my" queries will ask for a specific person instead.');
     }
   } catch (err) {
     console.log('[Savvy] Could not detect current user:', err.message);
@@ -265,6 +283,17 @@ async function autoFetchData(userMessage) {
       personId: currentUserPersonId,
       displayName: currentUserDisplayName || 'You',
     }, endpoints);
+  }
+  if (isMyQuery && currentUserRequiresNativeScoping) {
+    // Couldn't resolve identity directly (403 on userAccounts — a permission
+    // restriction, not "no data"). Live-verified: for a genuine self-service account,
+    // Oracle's own row-level security already scopes an unfiltered fetch to just that
+    // person's own records, so pass person=null and trust Oracle rather than
+    // incorrectly refusing "my" queries just because we couldn't pre-resolve who's
+    // asking. This would be wrong for an admin-level account (which sees everyone
+    // unfiltered) — but an admin-level account resolves via userAccounts directly and
+    // never reaches this branch in the first place.
+    return await fetchDataForPerson(null, endpoints);
   }
   if (isMyQuery && !currentUserPersonNumber) {
     // Never silently fall through to an unfiltered "everyone's data" fetch when the
