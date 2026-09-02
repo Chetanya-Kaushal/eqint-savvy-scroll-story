@@ -200,23 +200,49 @@ async function autoFetchData(userMessage) {
     return '[INFO] No specific data matched. Try asking about employees, absences, departments, jobs, grades, time cards, checklists, etc.';
   }
 
+  // Check if query mentions a specific person (e.g., "John Smith's absences")
+  let personFilter = null;
+  const personMatch = msg.match(/(?:for|of|belonging to|assigned to)\s+([a-z][a-z\s]+?)(?:'s|\s|$)/i)
+    || msg.match(/([a-z][a-z\s]+?)'s\s+(?:absence|leave|time|payroll|checklist|phone|email|address)/i);
+  if (personMatch) {
+    const nameGuess = personMatch[1].trim();
+    // Only resolve if it looks like a real name (2+ chars, not a keyword)
+    const isKeyword = HCM_ENDPOINTS.some(ep => ep.keywords.some(kw => nameGuess.includes(kw)));
+    if (nameGuess.length >= 2 && !isKeyword) {
+      try {
+        const workersUrl = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&q=DisplayName LIKE \'%25' + encodeURIComponent(nameGuess) + '%25\'&limit=5';
+        const result = await window.savvy.oracleApi(workersUrl, settings.oracleUser, settings.oraclePass);
+        if (result.ok && result.data?.items?.length > 0) {
+          const person = result.data.items[0];
+          personFilter = {
+            personId: person.PersonId || person.PersonNumber,
+            displayName: person.DisplayName || ((person.FirstName || '') + ' ' + (person.LastName || '')).trim(),
+          };
+        }
+      } catch {}
+    }
+  }
+
   const results = [];
   for (const ep of endpoints) {
     try {
-      const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
+      let url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
+      // If person resolved and endpoint supports PersonId filter, apply it
+      if (personFilter && personFilter.personId && ep.path !== '/workers') {
+        url += '&q=PersonId=' + personFilter.personId;
+      }
       const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
       if (!result.ok) {
         throw new Error('HTTP ' + result.status + ' ' + (result.statusText || '') + (result.body ? ' — ' + result.body.slice(0, 200) : ''));
       }
       const items = result.data?.items || [];
       if (items.length > 0) {
-        // Store raw data for LLM context
-        results.push(`[ORACLE DATA — ${ep.name}] ${items.length} records found:`);
+        const label = personFilter ? `${ep.name} for ${personFilter.displayName}` : ep.name;
+        results.push(`[ORACLE DATA — ${label}] ${items.length} records found:`);
         items.slice(0, 10).forEach((item, i) => {
           results.push(`  ${i + 1}. ${formatItem(ep.path, item)}`);
         });
-        // Also build HTML for chat display
-        results.push(`__HTML__${ep.name}__${ep.path}__${items.length}__${JSON.stringify(items)}`);
+        results.push(`__HTML__${label}__${ep.path}__${items.length}__${JSON.stringify(items)}`);
       } else {
         results.push(`[ORACLE DATA — ${ep.name}] No records found.`);
       }
