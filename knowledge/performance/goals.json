@@ -1,0 +1,20 @@
+{
+  "module": "goals",
+  "endpoint": "/goals",
+  "description": "Performance goals and objectives",
+  "dependsOn": {"PersonId": "workers"},
+  "fields": {
+    "GoalId": {"type": "integer", "description": "Goal ID", "required": true},
+    "PersonId": {"type": "integer", "description": "Person ID", "required": false},
+    "PersonNumber": {"type": "string", "description": "Employee number", "required": false},
+    "GoalName": {"type": "string", "description": "Goal name", "required": false},
+    "GoalType": {"type": "string", "description": "Goal type", "required": false},
+    "Description": {"type": "string", "description": "Goal description", "required": false},
+    "Status": {"type": "string", "description": "Status: NOT_STARTED, IN_PROGRESS, COMPLETED", "required": false},
+    "StartDate": {"type": "date", "description": "Start date", "required": false},
+    "DueDate": {"type": "date", "description": "Due date", "required": false},
+    "CompletionDate": {"type": "date", "description": "Completion date", "required": false},
+    "Weight": {"type": "number", "description": "Goal weight/importance", "required": false},
+    "Progress": {"type": "number", "description": "Progress percentage (0-100)", "required": false}
+  }
+}

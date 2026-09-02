@@ -1,0 +1,62 @@
+[
+  {
+    "id": "leave_policy",
+    "title": "Leave and Absence Policy",
+    "content": "Annual Leave: 15 days/year, max 5 carry-over, 2 weeks advance notice. Sick Leave: 12 days/year, doctor note >3 days. Personal: 3 days/year. Bereavement: 5 days immediate family. Maternity: 12 weeks paid. Paternity: 2 weeks paid."
+  },
+  {
+    "id": "onboarding",
+    "title": "Employee Onboarding Process",
+    "content": "Pre-arrival: create worker record, assign position/dept/location/manager, set up accounts. Day 1: manager welcome, HR orientation, IT setup, tour. Week 1: training schedule, assign buddy, compliance training. Month 1: 30-day checkpoint."
+  },
+  {
+    "id": "payroll",
+    "title": "Payroll Policy",
+    "content": "Bi-weekly pay, Friday pay day. Deductions: federal/state tax, SS 6.2%, Medicare 1.45%, 401k, health insurance. Overtime: 1.5x for >40hrs/week. Exempt threshold: $684/week. W-2 by Jan 31."
+  },
+  {
+    "id": "termination",
+    "title": "Termination Process",
+    "content": "Voluntary: receive resignation, enter in HCM, set effective date, exit interview, final pay 2 weeks, COBRA within 14 days. Involuntary: document performance, HR review, progressive discipline, severance calc. Disable access immediately."
+  },
+  {
+    "id": "performance",
+    "title": "Performance Management",
+    "content": "Annual cycle Oct-Sep. Oct: goal setting. Jan: mid-year check-in. Mar-Apr: self-assessment + peer feedback. May: manager review + calibration. Jun: final ratings. Ratings: Exceeds/Meets/Needs Improvement/Below Expectations."
+  },
+  {
+    "id": "recruitment",
+    "title": "Recruitment Process",
+    "content": "Requisition → approval chain → job posting → ATS screening → phone screen → technical assessment → panel interview → references → offer approval → background check → start date. Target: 21-30 business days."
+  },
+  {
+    "id": "compliance",
+    "title": "Compliance Rules",
+    "content": "EEO: no discrimination. FLSA: minimum wage, overtime tracking. ADA: confidential medical records. FMLA: 12 weeks unpaid leave after 12 months + 1250 hours. I-9: complete within 3 business days. GDPR/CCPA data privacy."
+  },
+  {
+    "id": "oracle_api",
+    "title": "Oracle HCM API Reference",
+    "content": "Auth: OAuth2 at /fscmRestApi/tokenoauth. Employees: GET/POST/PATCH /emps. Departments: GET/POST /departments. Absences: GET/POST /absences. Payroll: GET /payroll/runs, /payslips/{id}. Recruiting: GET/POST /requisitions, /candidates, /offers."
+  },
+  {
+    "id": "terminology",
+    "title": "Oracle HCM Terminology",
+    "content": "Person: primary worker entity. Worker: active employee or contingent. Assignment: specific job/position. Position: specific role. Job: grouping of positions. Grade: pay level. Organization: company/dept/team. Legislation Code: country code. Business Unit: top-level grouping. Effective Date: when change takes effect."
+  },
+  {
+    "id": "common_issues",
+    "title": "Common Issues and Solutions",
+    "content": "Employee not found: search by DisplayName, check status. Termination failed: cancel pending absences, check future-dated changes. Absence rejected: check balance, verify policy. Payroll error: verify elements, check tax jurisdiction. API 401: refresh token, verify credentials."
+  },
+  {
+    "id": "navigation",
+    "title": "Oracle Fusion Navigation",
+    "content": "Absences: Navigator > My Client Groups > Absences. Time Cards: Navigator > My Client Groups > Time > Time Cards. Payroll: Navigator > My Client Groups > Payroll > View Payroll Results. Employees: Navigator > My Client Groups > Person Management. Salary: Navigator > My Client Groups > Compensation > Salary. Documents: Navigator > My Client Groups > Documents."
+  },
+  {
+    "id": "otbi",
+    "title": "OTBI Reporting",
+    "content": "OTBI (Oracle Transactional Business Intelligence) is Oracle's built-in reporting tool. Access: Navigator > Analytics and Reports > Reports and Analytics. Create custom reports, dashboards, and analytics. Supports real-time and batch data."
+  }
+]

@@ -1,0 +1,188 @@
+{
+  "guide": "Oracle Fusion Cloud HCM Comprehensive Guide",
+  "modules": {
+    "workers": {
+      "name": "Workers (Employees)",
+      "description": "Manage person and employment information for workers",
+      "keyFields": ["PersonId", "PersonNumber", "DisplayName", "FirstName", "LastName", "DepartmentName", "JobName", "LocationName", "WorkerType", "EmploymentStatus"],
+      "actions": {
+        "getAll": "GET /workers",
+        "getById": "GET /workers/{PersonId}",
+        "search": "GET /workers?q=DisplayName='Smith'",
+        "getAssignments": "GET /workers/{PersonId}/child/assignments",
+        "getAddresses": "GET /workers/{PersonId}/child/addresses",
+        "getEmails": "GET /workers/{PersonId}/child/emails",
+        "getPhones": "GET /workers/{PersonId}/child/phoneNumbers"
+      },
+      "tips": [
+        "Use PersonNumber for unique employee IDs",
+        "DisplayName combines first and last name",
+        "DepartmentName shows the worker's department",
+        "WorkerType indicates EMPLOYEE, CONTINGENT_WORKER, etc."
+      ]
+    },
+    "absences": {
+      "name": "Absences (Leave Requests)",
+      "description": "Record, view, update, and withdraw employee absences",
+      "keyFields": ["PersonAbsenceEntryId", "AbsenceType", "StartDate", "EndDate", "AbsenceStatus", "AbsenceDays", "ApprovalStatus", "Comments"],
+      "actions": {
+        "getAll": "GET /absences",
+        "getById": "GET /absences/{absencesUniqID}",
+        "search": "GET /absences?q=AbsenceType='Vacation'",
+        "create": "POST /absences with body: {absenceTypeId, personId, startDate, endDate}",
+        "update": "PATCH /absences/{id} with body: {absenceStatusCd}",
+        "delete": "DELETE /absences/{id}",
+        "getBalance": "POST /absences/action/getAbsenceTypeBalance",
+        "getProjectedBalance": "POST /absences/action/loadProjectedBalance"
+      },
+      "absenceTypes": ["Vacation", "Sick Leave", "Personal Leave", "Maternity", "Paternity", "Bereavement", "Jury Duty", "Military Leave"],
+      "statusValues": ["SUBMITTED", "APPROVED", "REJECTED", "WITHDRAWN"],
+      "tips": [
+        "StartDate and EndDate are required for creating absences",
+        "AbsenceType must match a valid absence type ID",
+        "Use personId to filter absences for a specific employee",
+        "AbsenceDays is calculated automatically from dates"
+      ]
+    },
+    "departments": {
+      "name": "Departments",
+      "description": "Organization departments and their hierarchy",
+      "keyFields": ["DepartmentId", "Name", "ManagerName", "LocationName", "BusinessUnitId"],
+      "actions": {
+        "getAll": "GET /departments",
+        "getById": "GET /departments/{DepartmentId}",
+        "search": "GET /departments?q=Name='Engineering'"
+      }
+    },
+    "locations": {
+      "name": "Locations",
+      "description": "Work locations and offices",
+      "keyFields": ["LocationId", "Name", "LocationCode", "AddressLine1", "City", "Country", "PostalCode"],
+      "actions": {
+        "getAll": "GET /locations",
+        "getById": "GET /locations/{LocationId}",
+        "search": "GET /locations?q=City='New York'"
+      }
+    },
+    "jobs": {
+      "name": "Jobs",
+      "description": "Job definitions and job families",
+      "keyFields": ["JobId", "Name", "JobCode", "JobFamilyName", "JobCategory"],
+      "actions": {
+        "getAll": "GET /jobs",
+        "getById": "GET /jobs/{JobId}",
+        "search": "GET /jobs?q=Name='Software Engineer'"
+      }
+    },
+    "positions": {
+      "name": "Positions",
+      "description": "Position definitions within departments",
+      "keyFields": ["PositionId", "Name", "PositionCode", "DepartmentName", "JobName"],
+      "actions": {
+        "getAll": "GET /positions",
+        "getById": "GET /positions/{PositionId}"
+      }
+    },
+    "grades": {
+      "name": "Grades",
+      "description": "Compensation grades and salary ranges",
+      "keyFields": ["GradeId", "Name", "GradeCode", "MinimumSalary", "MaximumSalary"],
+      "actions": {
+        "getAll": "GET /grades",
+        "getById": "GET /grades/{GradeId}"
+      }
+    },
+    "timeCards": {
+      "name": "Time Cards",
+      "description": "Employee time and attendance tracking",
+      "keyFields": ["TimeCardId", "PayrollPeriodName", "TimeCardStatus", "StartDate", "EndDate", "TotalHours"],
+      "actions": {
+        "getAll": "GET /timeCards",
+        "getById": "GET /timeCards/{TimeCardId}",
+        "search": "GET /timeCards?q=TimeCardStatus='APPROVED'"
+      },
+      "statusValues": ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]
+    },
+    "payrollElements": {
+      "name": "Payroll Elements",
+      "description": "Earnings, deductions, and payroll information",
+      "keyFields": ["ElementEntryId", "Name", "Value", "Currency", "EffectiveStartDate", "ElementName"],
+      "actions": {
+        "getAll": "GET /payrollElements",
+        "getById": "GET /payrollElements/{ElementEntryId}"
+      }
+    },
+    "benefitPlans": {
+      "name": "Benefit Plans",
+      "description": "Available benefit plans (insurance, 401k, etc.)",
+      "keyFields": ["BenefitPlanId", "Name", "PlanType", "CoverageLevel", "EffectiveStartDate"],
+      "actions": {
+        "getAll": "GET /benefitPlans",
+        "getById": "GET /benefitPlans/{BenefitPlanId}"
+      }
+    },
+    "benefitEnrollments": {
+      "name": "Benefit Enrollments",
+      "description": "Employee benefit enrollments",
+      "keyFields": ["BenefitEnrollmentId", "BenefitPlanName", "EnrollmentStatus", "CoverageLevel", "EffectiveStartDate"],
+      "actions": {
+        "getAll": "GET /benefitEnrollments",
+        "search": "GET /benefitEnrollments?q=EnrollmentStatus='ACTIVE'"
+      }
+    },
+    "performanceReviews": {
+      "name": "Performance Reviews",
+      "description": "Employee performance evaluations",
+      "keyFields": ["PerformanceReviewId", "ReviewPeriod", "OverallRating", "Status"],
+      "actions": {
+        "getAll": "GET /performanceReviews",
+        "getById": "GET /performanceReviews/{PerformanceReviewId}"
+      }
+    },
+    "goals": {
+      "name": "Goals",
+      "description": "Employee performance goals",
+      "keyFields": ["GoalId", "GoalName", "GoalType", "Status", "DueDate"],
+      "actions": {
+        "getAll": "GET /goals",
+        "search": "GET /goals?q=Status='IN_PROGRESS'"
+      }
+    },
+    "learningCourses": {
+      "name": "Learning Courses",
+      "description": "Training and development courses",
+      "keyFields": ["CourseId", "CourseName", "Description", "Duration", "Status"],
+      "actions": {
+        "getAll": "GET /learningCourses",
+        "search": "GET /learningCourses?q=CourseName='Compliance'"
+      }
+    },
+    "allocatedChecklists": {
+      "name": "Checklists",
+      "description": "Person checklists and task tracking",
+      "keyFields": ["ChecklistId", "ChecklistName", "Status", "DueDate"],
+      "actions": {
+        "getAll": "GET /allocatedChecklists",
+        "getById": "GET /allocatedChecklists/{ChecklistId}",
+        "getTasks": "GET /allocatedChecklists/{id}/child/allocatedTasks"
+      }
+    }
+  },
+  "commonQueries": {
+    "showMyAbsences": "GET /absences?q=PersonId={yourPersonId}",
+    "showMyTeam": "GET /workers?onlyData=true",
+    "showDepartments": "GET /departments?onlyData=true",
+    "showLocations": "GET /locations?onlyData=true",
+    "showMyPayroll": "GET /payrollElements?onlyData=true",
+    "showMyBenefits": "GET /benefitEnrollments?onlyData=true",
+    "showMyTimeCards": "GET /timeCards?onlyData=true",
+    "searchEmployee": "GET /workers?q=DisplayName='{name}'",
+    "searchAbsence": "GET /absences?q=AbsenceType='{type}'"
+  },
+  "authentication": {
+    "method": "Basic Authentication",
+    "header": "Authorization: Basic base64(username:password)",
+    "contentType": "application/json",
+    "baseUrl": "https://{server}.fa.{region}.oraclecloud.com/hcmRestApi/resources/11.13.18.05/"
+  }
+}

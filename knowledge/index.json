@@ -1,0 +1,97 @@
+{
+  "version": "1.0",
+  "apiVersion": "11.13.18.05",
+  "baseUrl": "/hcmRestApi/resources/11.13.18.05",
+  "modules": {
+    "workers": {
+      "path": "workers",
+      "name": "Workers (Employees)",
+      "endpoint": "/workers",
+      "keywords": ["employee", "worker", "person", "team", "staff", "headcount", "hire", "termination", "transfer"]
+    },
+    "absences": {
+      "path": "absences",
+      "name": "Absences (Leave)",
+      "endpoint": "/absences",
+      "keywords": ["absence", "leave", "vacation", "sick", "time off", "pto", "holiday"]
+    },
+    "departments": {
+      "path": "departments",
+      "name": "Departments",
+      "endpoint": "/departments",
+      "keywords": ["department", "dept", "team", "group", "division"]
+    },
+    "locations": {
+      "path": "locations",
+      "name": "Locations",
+      "endpoint": "/locations",
+      "keywords": ["location", "office", "site", "address", "building"]
+    },
+    "jobs": {
+      "path": "jobs",
+      "name": "Jobs",
+      "endpoint": "/jobs",
+      "keywords": ["job", "title", "role", "position"]
+    },
+    "positions": {
+      "path": "positions",
+      "name": "Positions",
+      "endpoint": "/positions",
+      "keywords": ["position", "headcount", "vacancy"]
+    },
+    "grades": {
+      "path": "grades",
+      "name": "Grades",
+      "endpoint": "/grades",
+      "keywords": ["grade", "level", "band", "salary range", "compensation"]
+    },
+    "timeCards": {
+      "path": "timecards",
+      "name": "Time Cards",
+      "endpoint": "/timeCards",
+      "keywords": ["time card", "timesheet", "hours", "attendance", "clock"]
+    },
+    "payrollElements": {
+      "path": "payroll",
+      "name": "Payroll",
+      "endpoint": "/payrollElements",
+      "keywords": ["payroll", "pay", "salary", "earning", "deduction", "wage"]
+    },
+    "benefitEnrollments": {
+      "path": "benefits",
+      "name": "Benefits",
+      "endpoint": "/benefitEnrollments",
+      "keywords": ["benefit", "insurance", "401k", "health", "dental", "vision"]
+    },
+    "performanceReviews": {
+      "path": "performance",
+      "name": "Performance Reviews",
+      "endpoint": "/performanceReviews",
+      "keywords": ["performance", "review", "evaluation", "appraisal"]
+    },
+    "goals": {
+      "path": "performance",
+      "name": "Goals",
+      "endpoint": "/goals",
+      "keywords": ["goal", "objective", "target", "kpi"]
+    },
+    "learningCourses": {
+      "path": "learning",
+      "name": "Learning Courses",
+      "endpoint": "/learningCourses",
+      "keywords": ["course", "training", "learning", "development", "certification"]
+    },
+    "learningEnrollments": {
+      "path": "learning",
+      "name": "Learning Enrollments",
+      "endpoint": "/learningEnrollments",
+      "keywords": ["enrollment", "completion", "training record"]
+    },
+    "allocatedChecklists": {
+      "path": "checklists",
+      "name": "Checklists",
+      "endpoint": "/allocatedChecklists",
+      "keywords": ["checklist", "task", "onboarding", "offboarding"]
+    }
+  }
+}

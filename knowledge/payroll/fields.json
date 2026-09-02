@@ -1,0 +1,19 @@
+{
+  "module": "payrollElements",
+  "endpoint": "/payrollElements",
+  "description": "Payroll earnings, deductions, and elements",
+  "dependsOn": {"PersonId": "workers"},
+  "fields": {
+    "ElementEntryId": {"type": "integer", "description": "Element entry ID", "required": true},
+    "PersonId": {"type": "integer", "description": "Person ID", "required": false},
+    "PersonNumber": {"type": "string", "description": "Employee number", "required": false},
+    "ElementName": {"type": "string", "description": "Element name", "required": false},
+    "Name": {"type": "string", "description": "Display name", "required": false},
+    "Value": {"type": "number", "description": "Amount value", "required": false},
+    "Currency": {"type": "string", "description": "Currency code", "required": false},
+    "EffectiveStartDate": {"type": "date", "description": "Effective start date", "required": false},
+    "EffectiveEndDate": {"type": "date", "description": "Effective end date", "required": false},
+    "InputValueName": {"type": "string", "description": "Input value name", "required": false},
+    "PayrollRelationshipId": {"type": "integer", "description": "Payroll relationship ID", "required": false}
+  }
+}

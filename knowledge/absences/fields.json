@@ -1,0 +1,43 @@
+{
+  "module": "absences",
+  "endpoint": "/absences",
+  "description": "Leave requests, absences, and time-off records",
+  "dependsOn": {"PersonId": "workers"},
+  "fields": {
+    "PersonAbsenceEntryId": {"type": "integer", "description": "Unique absence entry ID", "required": true},
+    "AbsenceId": {"type": "integer", "description": "Absence ID", "required": false},
+    "AbsenceType": {"type": "string", "description": "Absence type name (e.g., Vacation, Sick Leave)", "required": true},
+    "AbsenceTypeId": {"type": "integer", "description": "Absence type ID", "required": true},
+    "StartDate": {"type": "date", "description": "Absence start date", "required": true},
+    "EndDate": {"type": "date", "description": "Absence end date", "required": true},
+    "AbsenceDays": {"type": "number", "description": "Number of days", "required": false},
+    "Duration": {"type": "number", "description": "Duration value", "required": false},
+    "UnitOfMeasure": {"type": "string", "description": "Unit: DAYS or HOURS", "required": false},
+    "AbsenceStatus": {"type": "string", "description": "Processing status: SUBMITTED, SAVED, PROCESSED", "required": false},
+    "ApprovalStatus": {"type": "string", "description": "Approval status: PENDING, APPROVED, REJECTED", "required": false},
+    "SubmittedDate": {"type": "date", "description": "Date submitted", "required": false},
+    "AbsenceReason": {"type": "string", "description": "Reason for absence", "required": false},
+    "Comments": {"type": "string", "description": "Additional comments", "required": false},
+    "PersonId": {"type": "integer", "description": "Person ID (foreign key to workers)", "required": true},
+    "PersonNumber": {"type": "string", "description": "Employee number", "required": false},
+    "LegalEntityId": {"type": "integer", "description": "Legal entity ID", "required": true},
+    "LegalEntityName": {"type": "string", "description": "Legal entity name", "required": false},
+    "LegislationCode": {"type": "string", "description": "Country legislation code", "required": false},
+    "ProcessingStatus": {"type": "string", "description": "Detailed processing status", "required": false},
+    "CreateDate": {"type": "datetime", "description": "Record creation date", "required": false},
+    "LastUpdateDate": {"type": "datetime", "description": "Last update timestamp", "required": false}
+  },
+  "childResources": {
+    "absenceAttachments": {"endpoint": "child/absenceAttachments", "description": "Attached documents"},
+    "absenceEntryCertifications": {"endpoint": "child/absenceEntryCertifications", "description": "Certifications"},
+    "absenceEntryDetails": {"endpoint": "child/absenceEntryDetails", "description": "Daily breakdown"},
+    "absenceEntitlements": {"endpoint": "child/absenceEntitlements", "description": "Entitlements consumed"},
+    "absenceMaternity": {"endpoint": "child/absenceMaternity", "description": "Maternity details"},
+    "linkedAbsences": {"endpoint": "child/linkedAbsences", "description": "Linked absences"}
+  },
+  "commonAbsenceTypes": ["Vacation", "Sick Leave", "Personal Leave", "Maternity", "Paternity", "Bereavement", "Jury Duty", "Military Leave", "Floating Holiday", "Bereavement Leave"],
+  "statusValues": {
+    "AbsenceStatus": ["SUBMITTED", "SAVED", "PROCESSED", "WITHDRAWN"],
+    "ApprovalStatus": ["PENDING", "APPROVED", "REJECTED", "NOT_SUBMITTED"]
+  }
+}

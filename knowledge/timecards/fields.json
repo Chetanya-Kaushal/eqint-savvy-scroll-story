@@ -1,0 +1,21 @@
+{
+  "module": "timeCards",
+  "endpoint": "/timeCards",
+  "description": "Time cards and timesheets",
+  "dependsOn": {"PersonId": "workers"},
+  "fields": {
+    "TimeCardId": {"type": "integer", "description": "Unique time card ID", "required": true},
+    "PersonId": {"type": "integer", "description": "Person ID", "required": false},
+    "PersonNumber": {"type": "string", "description": "Employee number", "required": false},
+    "PayrollPeriodName": {"type": "string", "description": "Payroll period name", "required": false},
+    "TimeCardStatus": {"type": "string", "description": "Status: DRAFT, SUBMITTED, APPROVED, REJECTED", "required": false},
+    "StartDate": {"type": "date", "description": "Period start date", "required": false},
+    "EndDate": {"type": "date", "description": "Period end date", "required": false},
+    "TotalHours": {"type": "number", "description": "Total hours worked", "required": false},
+    "ApprovedHours": {"type": "number", "description": "Approved hours", "required": false},
+    "SubmittedDate": {"type": "date", "description": "Date submitted", "required": false},
+    "ApprovedDate": {"type": "date", "description": "Date approved", "required": false},
+    "LastUpdateDate": {"type": "datetime", "description": "Last update timestamp", "required": false}
+  },
+  "statusValues": ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]
+}

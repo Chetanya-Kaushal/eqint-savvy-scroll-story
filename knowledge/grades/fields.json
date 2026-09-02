@@ -1,0 +1,18 @@
+{
+  "module": "grades",
+  "endpoint": "/grades",
+  "description": "Compensation grades and salary ranges",
+  "dependsOn": null,
+  "fields": {
+    "GradeId": {"type": "integer", "description": "Unique grade ID", "required": true},
+    "Name": {"type": "string", "description": "Grade name", "required": true},
+    "GradeCode": {"type": "string", "description": "Grade code", "required": false},
+    "GradeOrder": {"type": "integer", "description": "Grade sequence order", "required": false},
+    "MinimumSalary": {"type": "number", "description": "Minimum salary for grade", "required": false},
+    "MaximumSalary": {"type": "number", "description": "Maximum salary for grade", "required": false},
+    "Currency": {"type": "string", "description": "Currency code", "required": false},
+    "StartDate": {"type": "date", "description": "Effective start date", "required": false},
+    "EndDate": {"type": "date", "description": "Effective end date", "required": false},
+    "Status": {"type": "string", "description": "Status: ACTIVE, INACTIVE", "required": false}
+  }
+}

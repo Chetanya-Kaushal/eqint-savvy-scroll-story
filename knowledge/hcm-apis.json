@@ -1,0 +1,215 @@
+{
+  "version": "11.13.18.05",
+  "baseUrl": "/hcmRestApi/resources/11.13.18.05",
+  "modules": {
+    "absences": {
+      "name": "Absences",
+      "path": "/absences",
+      "description": "Record, view, update, and withdraw employee absences",
+      "endpoints": {
+        "getAll": { "method": "GET", "path": "/absences", "description": "Get all absence records" },
+        "getById": { "method": "GET", "path": "/absences/{absencesUniqID}", "description": "Get an absence record" },
+        "create": { "method": "POST", "path": "/absences", "description": "Create an absence record" },
+        "update": { "method": "PATCH", "path": "/absences/{absencesUniqID}", "description": "Update an absence record" },
+        "delete": { "method": "DELETE", "path": "/absences/{absencesUniqID}", "description": "Delete an absence record" },
+        "search": { "method": "POST", "path": "/absences/action/findByAdvancedSearchQuery", "description": "Search existing absences" },
+        "searchCases": { "method": "POST", "path": "/absences/action/findByAdvancedSearchQueryForCases", "description": "Display absence cases" },
+        "getBalance": { "method": "POST", "path": "/absences/action/getAbsenceTypeBalance", "description": "Get absence type balance" },
+        "getProjectedBalance": { "method": "POST", "path": "/absences/action/loadProjectedBalance", "description": "Display absence type projected balance" },
+        "getDailyDetails": { "method": "POST", "path": "/absences/action/absenceDailyDetailsBreakdown", "description": "Get daily and shift details" },
+        "planUse": { "method": "POST", "path": "/absences/action/planUse", "description": "Show absence plan usage" },
+        "getUserAccess": { "method": "POST", "path": "/absences/action/getUserAccessDetails", "description": "Retrieve user access details" }
+      },
+      "children": {
+        "attachments": { "path": "child/absenceAttachments", "description": "Absence attachments" },
+        "certifications": { "path": "child/absenceEntryCertifications", "description": "Absence certifications" },
+        "entryDetails": { "path": "child/absenceEntryDetails", "description": "Individual day breakdown" },
+        "entitlements": { "path": "child/absenceEntitlements", "description": "Entitlements consumed" },
+        "maternity": { "path": "child/absenceMaternity", "description": "Maternity absence details" },
+        "linkedAbsences": { "path": "child/linkedAbsences", "description": "Linked absence records" }
+      }
+    },
+    "workers": {
+      "name": "Workers",
+      "path": "/workers",
+      "description": "Employee and worker information",
+      "endpoints": {
+        "getAll": { "method": "GET", "path": "/workers", "description": "Get all workers" },
+        "getById": { "method": "GET", "path": "/workers/{workerId}", "description": "Get a worker by ID" },
+        "search": { "method": "POST", "path": "/workers/action/findByExtendedSearch", "description": "Search workers" },
+        "getAssignments": { "method": "GET", "path": "/workers/{workerId}/child/assignments", "description": "Get worker assignments" },
+        "getDegrees": { "method": "GET", "path": "/workers/{workerId}/child/degrees", "description": "Get worker degrees" },
+        "getAddresses": { "method": "GET", "path": "/workers/{workerId}/child/addresses", "description": "Get worker addresses" },
+        "getEmails": { "method": "GET", "path": "/workers/{workerId}/child/emails", "description": "Get worker email addresses" },
+        "getPhoneNumbers": { "method": "GET", "path": "/workers/{workerId}/child/phoneNumbers", "description": "Get worker phone numbers" }
+      }
+    },
+    "departments": {
+      "name": "Departments",
+      "path": "/departments",
+      "description": "Organization departments",
+      "endpoints": {
+        "getAll": { "method": "GET", "path": "/departments", "description": "Get all departments" },
+        "getById": { "method": "GET", "path": "/departments/{departmentId}", "description": "Get a department" },
+        "search": { "method": "POST", "path": "/departments/action/findByName", "description": "Search departments by name" }
+      }
+    },
+    "locations": {
+      "name": "Locations",
+      "path": "/locations",
+      "description": "Work locations",
+      "endpoints": {
+        "getAll": { "method": "GET", "path": "/locations", "description": "Get all locations" },
+        "getById": { "method": "GET", "path": "/locations/{locationId}", "description": "Get a location" }
+      }
+    },
+    "jobs": {
+      "name": "Jobs",
+      "path": "/jobs",
+      "description": "Job definitions",
+      "endpoints": {
+        "getAll": { "method": "GET", "path": "/jobs", "description": "Get all jobs" },
+        "getById": { "method": "GET", "path": "/jobs/{jobId}", "description": "Get a job" }
+      }
+    },
+    "positions": {
+      "name": "Positions",
+      "path": "/positions",
+      "description": "Position definitions",
+      "endpoints": {
+        "getAll": { "method": "GET", "path": "/positions", "description": "Get all positions" },
+        "getById": { "method": "GET", "path": "/positions/{positionId}", "description": "Get a position" }
+      }
+    },
+    "grades": {
+      "name": "Grades",
+      "path": "/grades",
+      "description": "Grade definitions",
+      "endpoints": {
+        "getAll": { "method": "GET", "path": "/grades", "description": "Get all grades" },
+        "getById": { "method": "GET", "path": "/grades/{gradeId}", "description": "Get a grade" }
+      }
+    },
+    "payroll": {
+      "name": "Payroll",
+      "path": "/payroll",
+      "description": "Payroll information",
+      "endpoints": {
+        "getPayrollDetails": { "method": "GET", "path": "/payrollElements", "description": "Get payroll elements" },
+        "getEarnings": { "method": "GET", "path": "/payrollEarnings", "description": "Get earnings" },
+        "getDeductions": { "method": "GET", "path": "/payrollDeductions", "description": "Get deductions" },
+        "getPayments": { "method": "GET", "path": "/payrollPayments", "description": "Get payment records" }
+      }
+    },
+    "time": {
+      "name": "Time",
+      "path": "/timeCards",
+      "description": "Time and attendance",
+      "endpoints": {
+        "getTimeCards": { "method": "GET", "path": "/timeCards", "description": "Get time cards" },
+        "getTimeEntries": { "method": "GET", "path": "/timeEntries", "description": "get time entries" },
+        "createTimeEntry": { "method": "POST", "path": "/timeEntries", "description": "Create a time entry" },
+        "updateTimeEntry": { "method": "PATCH", "path": "/timeEntries/{timeEntryId}", "description": "Update a time entry" },
+        "deleteTimeEntry": { "method": "DELETE", "path": "/timeEntries/{timeEntryId}", "description": "Delete a time entry" }
+      }
+    },
+    "performance": {
+      "name": "Performance",
+      "path": "/performance",
+      "description": "Performance management",
+      "endpoints": {
+        "getGoals": { "method": "GET", "path": "/goals", "description": "Get worker goals" },
+        "getReviews": { "method": "GET", "path": "/performanceReviews", "description": "Get performance reviews" },
+        "getRatings": { "method": "GET", "path": "/performanceRatings", "description": "Get performance ratings" }
+      }
+    },
+    "benefits": {
+      "name": "Benefits",
+      "path": "/benefits",
+      "description": "Benefits enrollment and plans",
+      "endpoints": {
+        "getPlans": { "method": "GET", "path": "/benefitPlans", "description": "Get benefit plans" },
+        "getEnrollments": { "method": "GET", "path": "/benefitEnrollments", "description": "Get benefit enrollments" },
+        "getLifeEvents": { "method": "GET", "path": "/benefitLifeEvents", "description": "Get benefit life events" }
+      }
+    },
+    "recruiting": {
+      "name": "Recruiting",
+      "path": "/recruitingRACItems",
+      "description": "Recruiting activity center",
+      "endpoints": {
+        "getActivityItems": { "method": "GET", "path": "/recruitingRACItems", "description": "Get activity items" },
+        "getJobApplications": { "method": "GET", "path": "/recruitingRACItems/{SubscriberTypeCode}/child/jobApplicationList", "description": "Get job applications" },
+        "getOfferList": { "method": "GET", "path": "/recruitingRACItems/{SubscriberTypeCode}/child/offerList", "description": "Get offer list" },
+        "getRequisitionList": { "method": "GET", "path": "/recruitingRACItems/{SubscriberTypeCode}/child/requisitionList", "description": "Get requisition list" },
+        "getJobRecommendations": { "method": "POST", "path": "/recruitingCEAIJobRecommendations", "description": "Get AI job recommendations" }
+      }
+    },
+    "learning": {
+      "name": "Learning",
+      "path": "/learning",
+      "description": "Learning and training",
+      "endpoints": {
+        "getCourses": { "method": "GET", "path": "/learningCourses", "description": "Get learning courses" },
+        "getEnrollments": { "method": "GET", "path": "/learningEnrollments", "description": "Get learning enrollments" },
+        "getCompletions": { "method": "GET", "path": "/learningCompletions", "description": "Get learning completions" }
+      }
+    },
+    "checklists": {
+      "name": "Checklists",
+      "path": "/allocatedChecklists",
+      "description": "Person checklists and tasks",
+      "endpoints": {
+        "getAll": { "method": "GET", "path": "/allocatedChecklists", "description": "Get all checklists" },
+        "getById": { "method": "GET", "path": "/allocatedChecklists/{allocatedChecklistsUniqID}", "description": "Get a checklist" },
+        "allocate": { "method": "POST", "path": "/allocatedChecklists/action/allocateChecklist", "description": "Allocate a checklist" },
+        "getTasks": { "method": "GET", "path": "/allocatedChecklists/{allocatedChecklistsUniqID}/child/allocatedTasks", "description": "Get checklist tasks" },
+        "updateTaskStatus": { "method": "POST", "path": "/allocatedChecklists/{allocatedChecklistsUniqID}/child/allocatedTasks/{AllocatedTaskId}/action/updateTaskStatus", "description": "Update task status" }
+      }
+    },
+    "talent": {
+      "name": "Talent",
+      "path": "/talentFeedbackSuggestions",
+      "description": "Talent feedback and suggestions",
+      "endpoints": {
+        "getAll": { "method": "GET", "path": "/talentFeedbackSuggestions", "description": "Get talent feedback" },
+        "getById": { "method": "GET", "path": "/talentFeedbackSuggestions/{talentFeedbackSuggestionsUniqID}", "description": "Get feedback suggestion" }
+      }
+    },
+    "organizations": {
+      "name": "Organizations",
+      "path": "/organizations",
+      "description": "Organization structures",
+      "endpoints": {
+        "getAll": { "method": "GET", "path": "/organizations", "description": "Get all organizations" },
+        "getBusinessUnits": { "method": "GET", "path": "/businessUnits", "description": "Get business units" },
+        "getLedgers": { "method": "GET", "path": "/ledgers", "description": "Get ledgers" },
+        "getLegalEntities": { "method": "GET", "path": "/legalEntities", "description": "Get legal entities" }
+      }
+    },
+    "lookup": {
+      "name": "Lookup Values",
+      "path": "/commonLookup",
+      "description": "Common lookup values",
+      "endpoints": {
+        "getAll": { "method": "GET", "path": "/commonLookup", "description": "Get all lookup values" },
+        "getByType": { "method": "GET", "path": "/commonLookup/{lookupType}", "description": "Get lookup by type" }
+      }
+    }
+  },
+  "commonQueryParams": {
+    "q": "Search query parameter for filtering (e.g., q=LastName='Smith')",
+    "onlyData": "Return only data without HCM resource links",
+    "totalResults": "Include total count in response",
+    "limit": "Number of results per page (default 25)",
+    "offset": "Offset for pagination",
+    "finder": "Finder name for predefined searches",
+    "expand": "Expand related resources",
+    "links": "Include HCM resource links"
+  },
+  "commonHeaders": {
+    "Authorization": "Basic base64(username:password)",
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+  }
+}

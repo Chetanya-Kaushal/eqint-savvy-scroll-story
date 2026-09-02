@@ -1,0 +1,71 @@
+{
+  "module": "workers",
+  "examples": [
+    {
+      "query": "Show all employees",
+      "api": "GET /workers?onlyData=true",
+      "description": "Fetches list of all workers"
+    },
+    {
+      "query": "Show employee John Smith",
+      "api": "GET /workers?q=DisplayName='John Smith'&onlyData=true",
+      "description": "Search by display name"
+    },
+    {
+      "query": "Show employee 12345",
+      "api": "GET /workers?q=PersonNumber='12345'&onlyData=true",
+      "description": "Search by person number"
+    },
+    {
+      "query": "Show employees in Engineering department",
+      "api": "GET /workers?q=DepartmentName='Engineering'&onlyData=true",
+      "description": "Filter by department name"
+    },
+    {
+      "query": "Show employees at New York office",
+      "api": "GET /workers?q=LocationName='New York'&onlyData=true",
+      "description": "Filter by location"
+    },
+    {
+      "query": "Show active employees",
+      "api": "GET /workers?q=EmploymentStatus='ACTIVE'&onlyData=true",
+      "description": "Filter by employment status"
+    },
+    {
+      "query": "Show employee addresses",
+      "api": "GET /workers/{PersonId}/child/addresses?onlyData=true",
+      "description": "Get child resource - addresses for a worker"
+    },
+    {
+      "query": "Show employee email",
+      "api": "GET /workers/{PersonId}/child/emails?onlyData=true",
+      "description": "Get child resource - emails for a worker"
+    },
+    {
+      "query": "Show employee phone",
+      "api": "GET /workers/{PersonId}/child/phoneNumbers?onlyData=true",
+      "description": "Get child resource - phone numbers for a worker"
+    }
+  ],
+  "sampleResponse": {
+    "PersonId": 300000003022427,
+    "PersonNumber": "EMP001",
+    "DisplayName": "John Smith",
+    "FirstName": "John",
+    "LastName": "Smith",
+    "DepartmentId": 300000001001234,
+    "DepartmentName": "Engineering",
+    "JobId": 300000002001234,
+    "JobName": "Software Engineer",
+    "LocationId": 300000003001234,
+    "LocationName": "New York Office",
+    "WorkerType": "EMPLOYEE",
+    "EmploymentStatus": "ACTIVE",
+    "HireDate": "2020-01-15",
+    "WorkEmail": "john.smith@company.com",
+    "WorkPhone": "+1-555-0123",
+    "ManagerId": 300000003022428,
+    "ManagerName": "Jane Doe",
+    "GradeName": "Senior Engineer"
+  }
+}

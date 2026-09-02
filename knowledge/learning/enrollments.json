@@ -1,0 +1,18 @@
+{
+  "module": "learningEnrollments",
+  "endpoint": "/learningEnrollments",
+  "description": "Learning enrollments and completions",
+  "dependsOn": {"PersonId": "workers", "CourseId": "learningCourses"},
+  "fields": {
+    "EnrollmentId": {"type": "integer", "description": "Enrollment ID", "required": true},
+    "PersonId": {"type": "integer", "description": "Person ID", "required": false},
+    "PersonNumber": {"type": "string", "description": "Employee number", "required": false},
+    "CourseId": {"type": "integer", "description": "Course ID", "required": false},
+    "CourseName": {"type": "string", "description": "Course name", "required": false},
+    "EnrollmentStatus": {"type": "string", "description": "Status: ENROLLED, IN_PROGRESS, COMPLETED, DROPPED", "required": false},
+    "CompletionDate": {"type": "date", "description": "Completion date", "required": false},
+    "Score": {"type": "number", "description": "Score/grade", "required": false},
+    "PassStatus": {"type": "string", "description": "Pass/fail status", "required": false},
+    "EnrollmentDate": {"type": "date", "description": "Date enrolled", "required": false}
+  }
+}

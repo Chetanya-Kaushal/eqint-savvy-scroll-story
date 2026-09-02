@@ -1,0 +1,18 @@
+{
+  "module": "learningCourses",
+  "endpoint": "/learningCourses",
+  "description": "Training and development courses",
+  "dependsOn": null,
+  "fields": {
+    "CourseId": {"type": "integer", "description": "Course ID", "required": true},
+    "CourseName": {"type": "string", "description": "Course name", "required": true},
+    "CourseCode": {"type": "string", "description": "Course code", "required": false},
+    "Description": {"type": "string", "description": "Course description", "required": false},
+    "Duration": {"type": "number", "description": "Duration value", "required": false},
+    "DurationUnit": {"type": "string", "description": "Duration unit: HOURS, DAYS", "required": false},
+    "Category": {"type": "string", "description": "Course category", "required": false},
+    "Status": {"type": "string", "description": "Status: ACTIVE, INACTIVE", "required": false},
+    "MaxEnrollments": {"type": "integer", "description": "Maximum enrollments", "required": false},
+    "CurrentEnrollments": {"type": "integer", "description": "Current enrollments", "required": false}
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "module": "absences",
+  "examples": [
+    {"query": "Show my absences", "api": "GET /absences?onlyData=true"},
+    {"query": "Show absences for John Smith", "api": "GET /absences?q=PersonId={PersonId}&onlyData=true"},
+    {"query": "Show vacation requests", "api": "GET /absences?q=AbsenceType='Vacation'&onlyData=true"},
+    {"query": "Show pending absences", "api": "GET /absences?q=ApprovalStatus='PENDING'&onlyData=true"},
+    {"query": "Show approved absences", "api": "GET /absences?q=ApprovalStatus='APPROVED'&onlyData=true"}
+  ],
+  "sampleResponse": {
+    "PersonAbsenceEntryId": 300000001234567,
+    "AbsenceType": "Vacation",
+    "AbsenceTypeId": 300000001001234,
+    "StartDate": "2026-01-15",
+    "EndDate": "2026-01-20",
+    "AbsenceDays": 5,
+    "UnitOfMeasure": "DAYS",
+    "AbsenceStatus": "PROCESSED",
+    "ApprovalStatus": "APPROVED",
+    "AbsenceReason": "Family vacation",
+    "PersonId": 300000003022427,
+    "PersonNumber": "EMP001"
+  }
+}

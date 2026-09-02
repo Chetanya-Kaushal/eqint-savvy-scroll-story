@@ -1,0 +1,18 @@
+{
+  "module": "absences",
+  "queryPatterns": [
+    {"pattern": "show (my )?absences", "intent": "list", "endpoint": "/absences"},
+    {"pattern": "show (my )?leave", "intent": "list", "endpoint": "/absences"},
+    {"pattern": "show (my )?vacation", "intent": "filter", "field": "AbsenceType", "value": "Vacation"},
+    {"pattern": "show (my )?sick leave", "intent": "filter", "field": "AbsenceType", "value": "Sick Leave"},
+    {"pattern": "absences for (.+)", "intent": "search", "field": "PersonNumber"},
+    {"pattern": "leave for (.+)", "intent": "search", "field": "PersonNumber"},
+    {"pattern": "show pending absences", "intent": "filter", "field": "ApprovalStatus", "value": "PENDING"},
+    {"pattern": "show approved absences", "intent": "filter", "field": "ApprovalStatus", "value": "APPROVED"},
+    {"pattern": "show rejected absences", "intent": "filter", "field": "ApprovalStatus", "value": "REJECTED"},
+    {"pattern": "absence balance", "intent": "action", "action": "getAbsenceTypeBalance"},
+    {"pattern": "leave balance", "intent": "action", "action": "getAbsenceTypeBalance"}
+  ],
+  "searchFields": ["AbsenceType", "AbsenceStatus", "ApprovalStatus", "PersonNumber", "PersonId"],
+  "filterFields": ["AbsenceType", "AbsenceStatus", "ApprovalStatus", "StartDate", "EndDate"]
+}

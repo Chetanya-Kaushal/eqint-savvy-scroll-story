@@ -1,0 +1,19 @@
+{
+  "module": "jobs",
+  "endpoint": "/jobs",
+  "description": "Job definitions and job families",
+  "dependsOn": null,
+  "fields": {
+    "JobId": {"type": "integer", "description": "Unique job ID", "required": true},
+    "Name": {"type": "string", "description": "Job name/title", "required": true},
+    "JobCode": {"type": "string", "description": "Job code", "required": false},
+    "JobFamilyId": {"type": "integer", "description": "Job family ID", "required": false},
+    "JobFamilyName": {"type": "string", "description": "Job family name", "required": false},
+    "JobCategory": {"type": "string", "description": "Job category", "required": false},
+    "JobCluster": {"type": "string", "description": "Job cluster", "required": false},
+    "ManagerLevel": {"type": "string", "description": "Manager level", "required": false},
+    "StartDate": {"type": "date", "description": "Effective start date", "required": false},
+    "EndDate": {"type": "date", "description": "Effective end date", "required": false},
+    "Status": {"type": "string", "description": "Status: ACTIVE, INACTIVE", "required": false}
+  }
+}

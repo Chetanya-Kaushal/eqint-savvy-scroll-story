@@ -1,0 +1,25 @@
+{
+  "module": "workers",
+  "queryPatterns": [
+    {"pattern": "show (all )?employees", "intent": "list", "endpoint": "/workers"},
+    {"pattern": "show (all )?workers", "intent": "list", "endpoint": "/workers"},
+    {"pattern": "show team", "intent": "list", "endpoint": "/workers"},
+    {"pattern": "show employee (.+)", "intent": "search", "field": "DisplayName"},
+    {"pattern": "show worker (.+)", "intent": "search", "field": "DisplayName"},
+    {"pattern": "person (.+)", "intent": "search", "field": "DisplayName"},
+    {"pattern": "employee number (.+)", "intent": "search", "field": "PersonNumber"},
+    {"pattern": "person number (.+)", "intent": "search", "field": "PersonNumber"},
+    {"pattern": "show (.+) department", "intent": "filter", "field": "DepartmentName"},
+    {"pattern": "employees in (.+)", "intent": "filter", "field": "DepartmentName"},
+    {"pattern": "show (.+) location", "intent": "filter", "field": "LocationName"},
+    {"pattern": "employees at (.+)", "intent": "filter", "field": "LocationName"},
+    {"pattern": "show active employees", "intent": "filter", "field": "EmploymentStatus", "value": "ACTIVE"},
+    {"pattern": "show terminated employees", "intent": "filter", "field": "EmploymentStatus", "value": "TERMINATED"},
+    {"pattern": "headcount", "intent": "count", "endpoint": "/workers"},
+    {"pattern": "total employees", "intent": "count", "endpoint": "/workers"},
+    {"pattern": "who is (.+) manager", "intent": "search", "field": "ManagerName"},
+    {"pattern": "(.+) reports to", "intent": "search", "field": "ManagerName"}
+  ],
+  "searchFields": ["DisplayName", "PersonNumber", "DepartmentName", "JobName", "LocationName", "ManagerName"],
+  "filterFields": ["EmploymentStatus", "WorkerType", "DepartmentName", "LocationName", "JobName"]
+}

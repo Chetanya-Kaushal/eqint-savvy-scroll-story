@@ -1,0 +1,22 @@
+{
+  "module": "locations",
+  "endpoint": "/locations",
+  "description": "Work locations and office addresses",
+  "dependsOn": null,
+  "fields": {
+    "LocationId": {"type": "integer", "description": "Unique location ID", "required": true},
+    "Name": {"type": "string", "description": "Location name", "required": true},
+    "LocationCode": {"type": "string", "description": "Location code", "required": false},
+    "AddressLine1": {"type": "string", "description": "Address line 1", "required": false},
+    "AddressLine2": {"type": "string", "description": "Address line 2", "required": false},
+    "AddressLine3": {"type": "string", "description": "Address line 3", "required": false},
+    "City": {"type": "string", "description": "City", "required": false},
+    "Region": {"type": "string", "description": "State/Region", "required": false},
+    "Country": {"type": "string", "description": "Country code", "required": false},
+    "PostalCode": {"type": "string", "description": "Postal/ZIP code", "required": false},
+    "TimeZone": {"type": "string", "description": "Time zone", "required": false},
+    "StartDate": {"type": "date", "description": "Effective start date", "required": false},
+    "EndDate": {"type": "date", "description": "Effective end date", "required": false},
+    "Status": {"type": "string", "description": "Status: ACTIVE, INACTIVE", "required": false}
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "module": "performanceReviews",
+  "endpoint": "/performanceReviews",
+  "description": "Performance evaluations and reviews",
+  "dependsOn": {"PersonId": "workers"},
+  "fields": {
+    "PerformanceReviewId": {"type": "integer", "description": "Review ID", "required": true},
+    "PersonId": {"type": "integer", "description": "Person ID", "required": false},
+    "PersonNumber": {"type": "string", "description": "Employee number", "required": false},
+    "ReviewPeriod": {"type": "string", "description": "Review period", "required": false},
+    "OverallRating": {"type": "string", "description": "Overall rating", "required": false},
+    "Status": {"type": "string", "description": "Status: DRAFT, IN_PROGRESS, COMPLETED", "required": false},
+    "StartDate": {"type": "date", "description": "Review start date", "required": false},
+    "EndDate": {"type": "date", "description": "Review end date", "required": false},
+    "ReviewerName": {"type": "string", "description": "Reviewer name", "required": false},
+    "Comments": {"type": "string", "description": "Review comments", "required": false}
+  }
+}

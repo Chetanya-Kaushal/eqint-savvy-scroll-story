@@ -1,0 +1,21 @@
+{
+  "module": "allocatedChecklists",
+  "endpoint": "/allocatedChecklists",
+  "description": "Person checklists and task tracking",
+  "dependsOn": {"PersonId": "workers"},
+  "fields": {
+    "ChecklistId": {"type": "integer", "description": "Checklist ID", "required": true},
+    "PersonId": {"type": "integer", "description": "Person ID", "required": false},
+    "PersonNumber": {"type": "string", "description": "Employee number", "required": false},
+    "ChecklistName": {"type": "string", "description": "Checklist name", "required": false},
+    "ChecklistType": {"type": "string", "description": "Checklist type", "required": false},
+    "Status": {"type": "string", "description": "Status: NOT_STARTED, IN_PROGRESS, COMPLETED", "required": false},
+    "StartDate": {"type": "date", "description": "Start date", "required": false},
+    "DueDate": {"type": "date", "description": "Due date", "required": false},
+    "CompletionDate": {"type": "date", "description": "Completion date", "required": false},
+    "AssignedToName": {"type": "string", "description": "Assigned to name", "required": false}
+  },
+  "childResources": {
+    "allocatedTasks": {"endpoint": "child/allocatedTasks", "description": "Checklist tasks"}
+  }
+}

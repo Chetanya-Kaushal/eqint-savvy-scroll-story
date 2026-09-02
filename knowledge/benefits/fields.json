@@ -1,0 +1,20 @@
+{
+  "module": "benefitEnrollments",
+  "endpoint": "/benefitEnrollments",
+  "description": "Employee benefit enrollments",
+  "dependsOn": {"PersonId": "workers", "BenefitPlanId": "benefitPlans"},
+  "fields": {
+    "BenefitEnrollmentId": {"type": "integer", "description": "Enrollment ID", "required": true},
+    "PersonId": {"type": "integer", "description": "Person ID", "required": false},
+    "PersonNumber": {"type": "string", "description": "Employee number", "required": false},
+    "BenefitPlanId": {"type": "integer", "description": "Plan ID", "required": false},
+    "BenefitPlanName": {"type": "string", "description": "Plan name", "required": false},
+    "EnrollmentStatus": {"type": "string", "description": "Status: ACTIVE, INACTIVE, PENDING", "required": false},
+    "CoverageLevel": {"type": "string", "description": "Coverage level", "required": false},
+    "EffectiveStartDate": {"type": "date", "description": "Effective start date", "required": false},
+    "EffectiveEndDate": {"type": "date", "description": "Effective end date", "required": false},
+    "ProviderName": {"type": "string", "description": "Insurance provider", "required": false},
+    "EnrollmentDate": {"type": "date", "description": "Date enrolled", "required": false},
+    "LastUpdateDate": {"type": "datetime", "description": "Last update timestamp", "required": false}
+  }
+}

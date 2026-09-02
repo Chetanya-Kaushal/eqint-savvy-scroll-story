@@ -1,0 +1,36 @@
+{
+  "name": "savvy-desktop",
+  "version": "1.0.0",
+  "description": "EQInt Savvy - Oracle HCM AI Assistant (Desktop Overlay)",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "build:portable": "electron-builder --win portable"
+  },
+  "author": "EQInt",
+  "license": "MIT",
+  "dependencies": {
+    "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.eqint.savvy-desktop",
+    "productName": "EQInt Savvy",
+    "win": {
+      "target": "portable",
+      "icon": "assets/icon.ico"
+    },
+    "portable": {
+      "artifactName": "EQInt Savvy.exe"
+    },
+    "files": [
+      "src/**/*",
+      "knowledge/**/*",
+      "assets/**/*"
+    ]
+  }
+}

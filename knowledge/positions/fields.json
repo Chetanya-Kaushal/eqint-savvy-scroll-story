@@ -1,0 +1,23 @@
+{
+  "module": "positions",
+  "endpoint": "/positions",
+  "description": "Position definitions within departments",
+  "dependsOn": {"DepartmentId": "departments", "JobId": "jobs"},
+  "fields": {
+    "PositionId": {"type": "integer", "description": "Unique position ID", "required": true},
+    "Name": {"type": "string", "description": "Position name", "required": true},
+    "PositionCode": {"type": "string", "description": "Position code", "required": false},
+    "DepartmentId": {"type": "integer", "description": "Department ID", "required": false},
+    "DepartmentName": {"type": "string", "description": "Department name", "required": false},
+    "JobId": {"type": "integer", "description": "Job ID", "required": false},
+    "JobName": {"type": "string", "description": "Job name", "required": false},
+    "LocationId": {"type": "integer", "description": "Location ID", "required": false},
+    "LocationName": {"type": "string", "description": "Location name", "required": false},
+    "WorkerType": {"type": "string", "description": "Worker type", "required": false},
+    "PositionMaxSize": {"type": "integer", "description": "Maximum headcount", "required": false},
+    "PositionCurrentSize": {"type": "integer", "description": "Current headcount", "required": false},
+    "StartDate": {"type": "date", "description": "Effective start date", "required": false},
+    "EndDate": {"type": "date", "description": "Effective end date", "required": false},
+    "Status": {"type": "string", "description": "Status: ACTIVE, INACTIVE", "required": false}
+  }
+}

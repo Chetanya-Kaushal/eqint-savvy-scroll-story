@@ -1,0 +1,20 @@
+{
+  "module": "departments",
+  "examples": [
+    {"query": "Show all departments", "api": "GET /departments?onlyData=true"},
+    {"query": "Show Engineering department", "api": "GET /departments?q=Name='Engineering'&onlyData=true"},
+    {"query": "Show departments in New York", "api": "GET /departments?q=LocationName='New York'&onlyData=true"}
+  ],
+  "sampleResponse": {
+    "DepartmentId": 300000001001234,
+    "Name": "Engineering",
+    "DepartmentCode": "ENG001",
+    "ManagerId": 300000003022428,
+    "ManagerName": "Jane Doe",
+    "LocationId": 300000003001234,
+    "LocationName": "New York Office",
+    "BusinessUnitName": "Technology",
+    "CostCenter": "CC1001",
+    "Status": "ACTIVE"
+  }
+}

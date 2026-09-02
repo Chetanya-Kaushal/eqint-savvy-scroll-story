@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, 'Segoe UI', Inter, sans-serif;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Main app container */
+#app {
+  width: 100vw; height: 100vh;
+  display: flex; flex-direction: column;
+  background: rgba(255,255,255,0.97);
+  border-radius: 14px;
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  overflow: hidden;
+}
+
+/* Title bar - drag region */
+#titlebar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #0070F3, #00C9A7);
+  color: white; cursor: grab;
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+}
+#titlebar:active { cursor: grabbing; }
+#titlebar .logo {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: rgba(255,255,255,0.2);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+#titlebar .logo img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+#titlebar .info { flex:1; margin-left: 10px; }
+#titlebar .name { font-weight: 600; font-size: 13px; }
+#titlebar .status { font-size: 10px; opacity: 0.85; }
+#titlebar .btn-group {
+  display: flex; gap: 4px;
+  -webkit-app-region: no-drag;
+}
+#titlebar .title-btn {
+  width: 24px; height: 24px; border: none; border-radius: 5px;
+  background: rgba(255,255,255,0.15); color: white;
+  cursor: pointer; font-size: 12px; display: flex;
+  align-items: center; justify-content: center;
+  -webkit-app-region: no-drag;
+}
+#titlebar .title-btn:hover { background: rgba(255,255,255,0.25); }
+
+/* Tabs */
+.tabs {
+  display: flex; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+.tab {
+  flex: 1; padding: 9px; border: none; background: none;
+  font-size: 11px; font-weight: 500; color: #64748b;
+  cursor: pointer; border-bottom: 2px solid transparent;
+}
+.tab.active { color: #0070F3; border-bottom-color: #0070F3; }
+
+/* Tab content */
+.tab-content { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+.tab-content.active { display: flex; }
+#tab-chat { flex-direction: column; }
+#tab-settings { flex-direction: column; overflow-y: auto; }
+
+/* Messages */
+.messages {
+  flex: 1; overflow-y: auto; padding: 10px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.msg { display: flex; gap: 7px; }
+.msg.bot { align-self: flex-start; }
+.msg.user { align-self: flex-end; flex-direction: row-reverse; }
+.msg-avatar {
+  width: 24px; height: 24px; border-radius: 6px; font-size: 9px;
+  font-weight: 700; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.msg.bot .msg-avatar { background: linear-gradient(135deg,#0070F3,#00C9A7); color: white; }
+.msg.user .msg-avatar { background: #e2e8f0; color: #475569; }
+.msg-text {
+  padding: 8px 12px; border-radius: 10px; font-size: 12px;
+  line-height: 1.4; word-break: break-word; white-space: pre-wrap;
+  max-width: 85%;
+}
+.msg.bot .msg-text { background: #f1f5f9; border-bottom-left-radius: 3px; }
+.msg.user .msg-text { background: #0070F3; color: white; border-bottom-right-radius: 3px; }
+.msg-text.thinking { color: #94a3b8; font-style: italic; }
+
+/* Input */
+.input-area {
+  display: flex; gap: 6px; padding: 10px; border-top: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+.input-area input {
+  flex: 1; padding: 8px 12px; border: 1px solid #e2e8f0;
+  border-radius: 8px; font-size: 12px; outline: none;
+}
+.input-area input:focus { border-color: #0070F3; }
+.send-btn {
+  padding: 8px 14px; background: linear-gradient(135deg,#0070F3,#00C9A7);
+  color: white; border: none; border-radius: 8px; font-weight: 600;
+  cursor: pointer; font-size: 12px;
+}
+
+/* Page Reader */
+#read-content {
+  flex: 1; overflow-y: auto; padding: 10px;
+  font-size: 11px; color: #334155; line-height: 1.5;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  white-space: pre-wrap; word-break: break-word;
+}
+.read-btn {
+  margin: 10px; padding: 10px; background: linear-gradient(135deg,#0070F3,#00C9A7);
+  color: white; border: none; border-radius: 8px; font-weight: 600;
+  cursor: pointer; font-size: 12px; flex-shrink: 0;
+}
+
+/* Settings */
+.setting-group { padding: 12px; }
+.setting-label {
+  font-size: 10px; font-weight: 600; color: #64748b;
+  text-transform: uppercase; margin-bottom: 4px;
+}
+.setting-input {
+  width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0;
+  border-radius: 7px; font-size: 12px; outline: none;
+}
+.setting-input:focus { border-color: #0070F3; }
+.save-btn {
+  margin: 12px; padding: 10px; background: linear-gradient(135deg,#0070F3,#00C9A7);
+  color: white; border: none; border-radius: 8px; font-weight: 600;
+  cursor: pointer; font-size: 12px; width: calc(100% - 24px);
+}
+.saved-msg {
+  display: none; padding: 6px 10px; background: #f0fdf4;
+  border: 1px solid #bbf7d0; border-radius: 6px; font-size: 11px;
+  color: #166534; margin: 0 12px 8px;
+}
+
+/* Quick actions */
+.quick-bar {
+  display: flex; gap: 4px; padding: 6px 10px; flex-shrink: 0;
+  overflow-x: auto;
+}
+.quick-btn {
+  padding: 5px 8px; background: #f1f5f9; border: 1px solid #e2e8f0;
+  border-radius: 6px; font-size: 10px; cursor: pointer; white-space: nowrap;
+  color: #475569;
+}
+.quick-btn:hover { background: #e2e8f0; }
+
+/* Collapsible sections */
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0;
+  border-radius: 8px; cursor: pointer; margin: 8px 12px 0;
+  font-size: 11px; font-weight: 600; color: #334155;
+}
+.section-header:hover { background: #f1f5f9; }
+.section-header .arrow {
+  transition: transform 0.2s;
+  font-size: 10px; color: #64748b;
+}
+.section-header.expanded .arrow { transform: rotate(90deg); }
+.section-content {
+  display: none; padding: 12px;
+  border: 1px solid #e2e8f0; border-top: none;
+  border-radius: 0 0 8px 8px; margin: 0 12px;
+  font-size: 11px; color: #64748b; line-height: 1.5;
+}
+.section-content.expanded { display: block; }
+
+/* Live read status */
+.live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #FEF3C7;
+  border: 1px solid #FCD34D;
+  border-radius: 12px;
+  font-size: 10px;
+  color: #92400E;
+  font-weight: 600;
+}
+.live-indicator::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: #EF4444;
+  border-radius: 50%;
+  animation: pulse-live 1.5s ease-in-out infinite;
+}
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+.read-btn.live-active {
+  background: linear-gradient(135deg, #EF4444, #DC2626) !important;
+}
+
+/* Bubble mode - Moon in clouds */
+#bubble-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: transparent;
+  z-index: 1000;
+  cursor: pointer;
+}
+#bubble-overlay .bubble-container {
+  width: 80px;
+  height: 80px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+/* Cloud layers */
+#bubble-overlay .cloud {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9), rgba(200,220,240,0.6));
+  box-shadow: 
+    0 4px 15px rgba(255,255,255,0.4),
+    inset 0 -2px 8px rgba(180,200,220,0.3);
+  animation: float 4s ease-in-out infinite;
+}
+#bubble-overlay .cloud-1 {
+  width: 50px; height: 28px;
+  top: 40px; left: -5px;
+  border-radius: 20px;
+  animation-delay: 0s;
+}
+#bubble-overlay .cloud-2 {
+  width: 40px; height: 22px;
+  top: 44px; right: -8px;
+  border-radius: 16px;
+  animation-delay: 0.5s;
+}
+#bubble-overlay .cloud-3 {
+  width: 35px; height: 18px;
+  top: 50px; left: 8px;
+  border-radius: 14px;
+  opacity: 0.8;
+  animation-delay: 1s;
+}
+/* Moon/Globe */
+#bubble-overlay .moon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0070F3 0%, #00C9A7 50%, #00F5D4 100%);
+  box-shadow: 
+    0 0 20px rgba(0,112,243,0.6),
+    0 0 40px rgba(0,201,167,0.4),
+    0 0 60px rgba(0,245,212,0.2),
+    inset -8px -8px 20px rgba(0,0,0,0.2),
+    inset 4px 4px 10px rgba(255,255,255,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transition: all 0.3s ease;
+  animation: glow 3s ease-in-out infinite;
+}
+#bubble-overlay .moon:hover {
+  transform: scale(1.1);
+  box-shadow: 
+    0 0 30px rgba(0,112,243,0.8),
+    0 0 50px rgba(0,201,167,0.6),
+    0 0 70px rgba(0,245,212,0.3);
+}
+#bubble-overlay .moon img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  filter: brightness(1.1);
+}
+/* Sparkles */
+#bubble-overlay .sparkle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: white;
+  border-radius: 50%;
+  animation: twinkle 2s ease-in-out infinite;
+}
+#bubble-overlay .sparkle-1 { top: 15px; left: 18px; animation-delay: 0s; }
+#bubble-overlay .sparkle-2 { top: 25px; right: 12px; animation-delay: 0.7s; }
+#bubble-overlay .sparkle-3 { top: 8px; right: 20px; animation-delay: 1.4s; }
+#bubble-overlay .sparkle-4 { bottom: 30px; left: 10px; animation-delay: 0.3s; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+@keyframes glow {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.15); }
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.5); }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="titlebar">
+    <div class="logo"><img src="../assets/icon.png" alt="EQInt" onerror="this.style.display='none';this.parentNode.innerHTML='<span style=\'font-weight:700;font-size:12px;\'>EQ</span>'" /></div>
+    <div class="info">
+      <div class="name">Savvy</div>
+      <div class="status" id="status">Ready</div>
+    </div>
+    <div class="btn-group">
+      <button class="title-btn" id="collapseBtn" title="Minimize to bubble">&#8722;</button>
+      <button class="title-btn" id="closeBtn" title="Hide">&#10005;</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="chat">Chat</button>
+    <button class="tab" data-tab="settings">Settings</button>
+  </div>
+
+  <!-- Chat Tab -->
+  <div id="tab-chat" class="tab-content active">
+    <div class="messages" id="messages">
+      <div class="msg bot">
+        <div class="msg-avatar">EQ</div>
+        <div class="msg-text">Hi! I can see your Oracle page and help you navigate. Ask me anything.</div>
+      </div>
+    </div>
+    <div class="quick-bar">
+      <button class="quick-btn" data-q="Show my absences">Absences</button>
+      <button class="quick-btn" data-q="How do I clock in?">Clock In</button>
+      <button class="quick-btn" data-q="Show payroll details">Payroll</button>
+      <button class="quick-btn" id="clearChatBtn" style="background:#ef4444;color:white;">Clear</button>
+    </div>
+    <div class="input-area">
+      <input type="text" id="chatInput" placeholder="Ask about this page..." />
+      <button class="send-btn" id="sendBtn">Send</button>
+    </div>
+  </div>
+
+  <!-- Settings Tab -->
+  <div id="tab-settings" class="tab-content">
+    <div class="setting-group">
+      <div class="setting-label">Ollama URL</div>
+      <input class="setting-input" id="setOllamaUrl" value="http://localhost:11434" />
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">Model</div>
+      <input class="setting-input" id="setOllamaModel" value="phi3:mini" />
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">Oracle URL</div>
+      <input class="setting-input" id="setOracleUrl" placeholder="https://your-oracle-cloud.com" />
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">Oracle Username</div>
+      <input class="setting-input" id="setOracleUser" placeholder="username" />
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">Oracle Password</div>
+      <input class="setting-input" id="setOraclePass" type="password" placeholder="password" />
+    </div>
+    <div class="saved-msg" id="savedMsg">Settings saved!</div>
+    <button class="save-btn" id="saveBtn">Save Settings</button>
+
+    <!-- Read Page Section -->
+    <div class="section-header" id="readSectionHeader">
+      <span>Read Page</span>
+      <span class="arrow">&#9654;</span>
+    </div>
+    <div class="section-content" id="readSectionContent">
+      <div id="window-list">
+        <div class="setting-label" style="margin-bottom:8px;">Select a window to read:</div>
+        <div id="windows-container"></div>
+        <button class="read-btn" id="refreshWindows" style="margin:0 0 8px 0;width:100%;">Refresh Windows</button>
+      </div>
+      <div id="read-content" style="display:none;flex:1;overflow-y:auto;padding:10px;font-size:11px;color:#334155;line-height:1.5;font-family:'Cascadia Code','Fira Code',monospace;white-space:pre-wrap;word-break:break-word;"></div>
+      <div id="read-controls" style="display:none;padding:8px 12px;border-top:1px solid #e2e8f0;flex-shrink:0;">
+        <button class="read-btn" id="liveReadBtn" style="width:100%;margin:0;background:linear-gradient(135deg, #8B5CF6, #7C3AED);">Live Read</button>
+      </div>
+      <button class="read-btn" id="backToWindows" style="display:none;margin:10px 0;width:100%;">Back to Window List</button>
+    </div>
+
+    <!-- Understand Section -->
+    <div class="section-header" id="understandSectionHeader">
+      <span>Understand (HCM Discovery)</span>
+      <span class="arrow">&#9654;</span>
+    </div>
+    <div class="section-content" id="understandSectionContent">
+      <div style="margin-bottom:10px;">
+        Fetch all HCM data your account can access. This builds a local repository so Savvy can answer questions using your actual organizational data.
+      </div>
+      <div style="margin-bottom:10px;padding:8px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;">
+        <strong>What gets fetched:</strong><br>
+        Employees, Departments, Locations, Jobs, Grades, Positions, Absences, Time Cards, Payroll, Salaries, Performance Reviews, Goals, Benefits
+      </div>
+      <button class="read-btn" id="understandBtn" style="width:100%;margin-bottom:10px;">Discover My HCM System</button>
+      <div id="understand-progress" style="display:none;"></div>
+      <div id="understand-status" style="display:none;margin-top:8px;padding:8px;border-radius:6px;font-size:11px;"></div>
+      <div id="understand-summary" style="display:none;margin-top:8px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:11px;color:#166534;white-space:pre-wrap;line-height:1.5;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Bubble overlay (shown when collapsed) - Moon in clouds -->
+<div id="bubble-overlay">
+  <div class="bubble-container">
+    <div class="cloud cloud-1"></div>
+    <div class="cloud cloud-2"></div>
+    <div class="cloud cloud-3"></div>
+    <div class="moon">
+      <img src="../assets/icon.png" alt="EQInt" onerror="this.style.display='none';this.parentNode.innerHTML='<span style=\'font-weight:700;font-size:16px;color:white;\'>EQ</span>'" />
+    </div>
+    <div class="sparkle sparkle-1"></div>
+    <div class="sparkle sparkle-2"></div>
+    <div class="sparkle sparkle-3"></div>
+    <div class="sparkle sparkle-4"></div>
+  </div>
+</div>
+
+<script src="overlay.js"></script>
+</body>
+</html>

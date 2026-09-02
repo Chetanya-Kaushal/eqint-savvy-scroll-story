@@ -1,0 +1,24 @@
+{
+  "module": "departments",
+  "endpoint": "/departments",
+  "description": "Organization departments and hierarchy",
+  "dependsOn": null,
+  "fields": {
+    "DepartmentId": {"type": "integer", "description": "Unique department ID", "required": true},
+    "Name": {"type": "string", "description": "Department name", "required": true},
+    "NameTL": {"type": "string", "description": "Translated department name", "required": false},
+    "DepartmentCode": {"type": "string", "description": "Department code", "required": false},
+    "ManagerId": {"type": "integer", "description": "Manager PersonId", "required": false},
+    "ManagerName": {"type": "string", "description": "Manager display name", "required": false},
+    "LocationId": {"type": "integer", "description": "Location ID", "required": false},
+    "LocationName": {"type": "string", "description": "Location name", "required": false},
+    "BusinessUnitId": {"type": "integer", "description": "Business unit ID", "required": false},
+    "BusinessUnitName": {"type": "string", "description": "Business unit name", "required": false},
+    "CostCenter": {"type": "string", "description": "Cost center code", "required": false},
+    "ParentDepartmentId": {"type": "integer", "description": "Parent department ID", "required": false},
+    "ParentDepartmentName": {"type": "string", "description": "Parent department name", "required": false},
+    "StartDate": {"type": "date", "description": "Effective start date", "required": false},
+    "EndDate": {"type": "date", "description": "Effective end date", "required": false},
+    "Status": {"type": "string", "description": "Status: ACTIVE, INACTIVE", "required": false}
+  }
+}

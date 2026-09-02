@@ -1,0 +1,374 @@
+{
+  "apiVersion": "11.13.18.05",
+  "apis": {
+    "workers": {
+      "endpoint": "/workers",
+      "description": "Employee and worker information",
+      "dependsOn": null,
+      "fields": {
+        "PersonId": "Unique person identifier",
+        "PersonNumber": "Person number (employee ID)",
+        "DisplayName": "Full display name",
+        "FirstName": "First name",
+        "LastName": "Last name",
+        "MiddleNames": "Middle names",
+        "DateOfBirth": "Date of birth",
+        "Gender": "Gender",
+        "Nationality": "Nationality",
+        "MaritalStatus": "Marital status",
+        "DepartmentId": "Department ID",
+        "DepartmentName": "Department name",
+        "JobId": "Job ID",
+        "JobName": "Job name",
+        "PositionId": "Position ID",
+        "PositionName": "Position name",
+        "LocationId": "Location ID",
+        "LocationName": "Location name",
+        "WorkerType": "Worker type (EMPLOYEE, CONTINGENT_WORKER)",
+        "EmploymentStatus": "Employment status",
+        "HireDate": "Hire date",
+        "PeriodOfServiceStartDate": "Service start date",
+        "WorkEmail": "Work email",
+        "EmailAddress": "Email address",
+        "WorkPhone": "Work phone",
+        "PhoneNumber": "Phone number",
+        "ManagerId": "Manager person ID",
+        "ManagerName": "Manager name",
+        "GradeId": "Grade ID",
+        "GradeName": "Grade name",
+        "Salary": "Salary amount",
+        "Currency": "Currency code"
+      },
+      "searchFields": ["DisplayName", "PersonNumber", "DepartmentName", "JobName", "LocationName"]
+    },
+    "absences": {
+      "endpoint": "/absences",
+      "description": "Leave requests and absences",
+      "dependsOn": {"PersonId": "workers"},
+      "fields": {
+        "PersonAbsenceEntryId": "Absence entry ID",
+        "AbsenceId": "Absence ID",
+        "AbsenceType": "Absence type name",
+        "AbsenceTypeId": "Absence type ID",
+        "StartDate": "Start date",
+        "EndDate": "End date",
+        "AbsenceDays": "Number of days",
+        "Duration": "Duration",
+        "UnitOfMeasure": "Unit (DAYS, HOURS)",
+        "AbsenceStatus": "Processing status",
+        "ApprovalStatus": "Approval status",
+        "SubmittedDate": "Submitted date",
+        "AbsenceReason": "Reason for absence",
+        "Comments": "Comments",
+        "PersonId": "Person ID",
+        "PersonNumber": "Person number",
+        "LegalEntityId": "Legal entity ID",
+        "LegalEntityName": "Legal entity name",
+        "LegislationCode": "Legislation code",
+        "ProcessingStatus": "Processing status",
+        "CreateDate": "Created date",
+        "LastUpdateDate": "Last updated date"
+      },
+      "searchFields": ["AbsenceType", "AbsenceStatus", "ApprovalStatus", "PersonNumber"]
+    },
+    "departments": {
+      "endpoint": "/departments",
+      "description": "Organization departments",
+      "dependsOn": null,
+      "fields": {
+        "DepartmentId": "Department ID",
+        "Name": "Department name",
+        "NameTL": "Translated name",
+        "DepartmentCode": "Department code",
+        "ManagerId": "Manager person ID",
+        "ManagerName": "Manager name",
+        "LocationId": "Location ID",
+        "LocationName": "Location name",
+        "BusinessUnitId": "Business unit ID",
+        "BusinessUnitName": "Business unit name",
+        "CostCenter": "Cost center",
+        "StartDate": "Start date",
+        "EndDate": "End date",
+        "Status": "Status"
+      },
+      "searchFields": ["Name", "DepartmentCode", "LocationName", "BusinessUnitName"]
+    },
+    "locations": {
+      "endpoint": "/locations",
+      "description": "Work locations and offices",
+      "dependsOn": null,
+      "fields": {
+        "LocationId": "Location ID",
+        "Name": "Location name",
+        "LocationCode": "Location code",
+        "AddressLine1": "Address line 1",
+        "AddressLine2": "Address line 2",
+        "AddressLine3": "Address line 3",
+        "City": "City",
+        "Region": "State/Region",
+        "Country": "Country",
+        "PostalCode": "Postal code",
+        "TimeZone": "Time zone",
+        "StartDate": "Start date",
+        "EndDate": "End date",
+        "Status": "Status"
+      },
+      "searchFields": ["Name", "LocationCode", "City", "Country", "Region"]
+    },
+    "jobs": {
+      "endpoint": "/jobs",
+      "description": "Job definitions",
+      "dependsOn": null,
+      "fields": {
+        "JobId": "Job ID",
+        "Name": "Job name",
+        "JobCode": "Job code",
+        "JobFamilyId": "Job family ID",
+        "JobFamilyName": "Job family name",
+        "JobCategory": "Job category",
+        "JobCluster": "Job cluster",
+        "ManagerLevel": "Manager level",
+        "StartDate": "Start date",
+        "EndDate": "End date",
+        "Status": "Status"
+      },
+      "searchFields": ["Name", "JobCode", "JobFamilyName", "JobCategory"]
+    },
+    "positions": {
+      "endpoint": "/positions",
+      "description": "Position definitions",
+      "dependsOn": {"DepartmentId": "departments", "JobId": "jobs"},
+      "fields": {
+        "PositionId": "Position ID",
+        "Name": "Position name",
+        "PositionCode": "Position code",
+        "DepartmentId": "Department ID",
+        "DepartmentName": "Department name",
+        "JobId": "Job ID",
+        "JobName": "Job name",
+        "LocationId": "Location ID",
+        "LocationName": "Location name",
+        "WorkerType": "Worker type",
+        "PositionMaxSize": "Maximum headcount",
+        "PositionCurrentSize": "Current headcount",
+        "StartDate": "Start date",
+        "EndDate": "End date",
+        "Status": "Status"
+      },
+      "searchFields": ["Name", "PositionCode", "DepartmentName", "JobName"]
+    },
+    "grades": {
+      "endpoint": "/grades",
+      "description": "Compensation grades",
+      "dependsOn": null,
+      "fields": {
+        "GradeId": "Grade ID",
+        "Name": "Grade name",
+        "GradeCode": "Grade code",
+        "GradeOrder": "Grade order",
+        "MinimumSalary": "Minimum salary",
+        "MaximumSalary": "Maximum salary",
+        "Currency": "Currency code",
+        "StartDate": "Start date",
+        "EndDate": "End date",
+        "Status": "Status"
+      },
+      "searchFields": ["Name", "GradeCode"]
+    },
+    "timeCards": {
+      "endpoint": "/timeCards",
+      "description": "Time cards and timesheets",
+      "dependsOn": {"PersonId": "workers"},
+      "fields": {
+        "TimeCardId": "Time card ID",
+        "PersonId": "Person ID",
+        "PersonNumber": "Person number",
+        "PayrollPeriodName": "Payroll period",
+        "TimeCardStatus": "Status",
+        "StartDate": "Start date",
+        "EndDate": "End date",
+        "TotalHours": "Total hours",
+        "ApprovedHours": "Approved hours",
+        "SubmittedDate": "Submitted date",
+        "ApprovedDate": "Approved date",
+        "LastUpdateDate": "Last updated date"
+      },
+      "searchFields": ["TimeCardStatus", "PayrollPeriodName", "PersonNumber"]
+    },
+    "payrollElements": {
+      "endpoint": "/payrollElements",
+      "description": "Payroll earnings and deductions",
+      "dependsOn": {"PersonId": "workers"},
+      "fields": {
+        "ElementEntryId": "Element entry ID",
+        "PersonId": "Person ID",
+        "PersonNumber": "Person number",
+        "ElementName": "Element name",
+        "Name": "Display name",
+        "Value": "Amount value",
+        "Currency": "Currency code",
+        "EffectiveStartDate": "Effective start date",
+        "EffectiveEndDate": "Effective end date",
+        "InputValueName": "Input value name",
+        "PayrollRelationshipId": "Payroll relationship ID"
+      },
+      "searchFields": ["ElementName", "Name", "PersonNumber"]
+    },
+    "benefitPlans": {
+      "endpoint": "/benefitPlans",
+      "description": "Available benefit plans",
+      "dependsOn": null,
+      "fields": {
+        "BenefitPlanId": "Plan ID",
+        "Name": "Plan name",
+        "PlanCode": "Plan code",
+        "PlanType": "Plan type",
+        "ProviderName": "Provider name",
+        "CoverageLevels": "Coverage levels",
+        "StartDate": "Start date",
+        "EndDate": "End date",
+        "Status": "Status"
+      },
+      "searchFields": ["Name", "PlanCode", "PlanType", "ProviderName"]
+    },
+    "benefitEnrollments": {
+      "endpoint": "/benefitEnrollments",
+      "description": "Employee benefit enrollments",
+      "dependsOn": {"PersonId": "workers", "BenefitPlanId": "benefitPlans"},
+      "fields": {
+        "BenefitEnrollmentId": "Enrollment ID",
+        "PersonId": "Person ID",
+        "PersonNumber": "Person number",
+        "BenefitPlanId": "Plan ID",
+        "BenefitPlanName": "Plan name",
+        "EnrollmentStatus": "Status",
+        "CoverageLevel": "Coverage level",
+        "EffectiveStartDate": "Effective start date",
+        "EffectiveEndDate": "Effective end date",
+        "ProviderName": "Provider name",
+        "EnrollmentDate": "Enrollment date",
+        "LastUpdateDate": "Last updated date"
+      },
+      "searchFields": ["BenefitPlanName", "EnrollmentStatus", "PersonNumber"]
+    },
+    "performanceReviews": {
+      "endpoint": "/performanceReviews",
+      "description": "Performance evaluations",
+      "dependsOn": {"PersonId": "workers"},
+      "fields": {
+        "PerformanceReviewId": "Review ID",
+        "PersonId": "Person ID",
+        "PersonNumber": "Person number",
+        "ReviewPeriod": "Review period",
+        "OverallRating": "Overall rating",
+        "Status": "Status",
+        "StartDate": "Start date",
+        "EndDate": "End date",
+        "ReviewerName": "Reviewer name",
+        "Comments": "Comments"
+      },
+      "searchFields": ["OverallRating", "Status", "ReviewPeriod", "PersonNumber"]
+    },
+    "goals": {
+      "endpoint": "/goals",
+      "description": "Performance goals",
+      "dependsOn": {"PersonId": "workers"},
+      "fields": {
+        "GoalId": "Goal ID",
+        "PersonId": "Person ID",
+        "PersonNumber": "Person number",
+        "GoalName": "Goal name",
+        "GoalType": "Goal type",
+        "Description": "Description",
+        "Status": "Status",
+        "StartDate": "Start date",
+        "DueDate": "Due date",
+        "CompletionDate": "Completion date",
+        "Weight": "Weight",
+        "Progress": "Progress percentage"
+      },
+      "searchFields": ["GoalName", "GoalType", "Status", "PersonNumber"]
+    },
+    "learningCourses": {
+      "endpoint": "/learningCourses",
+      "description": "Training courses",
+      "dependsOn": null,
+      "fields": {
+        "CourseId": "Course ID",
+        "CourseName": "Course name",
+        "CourseCode": "Course code",
+        "Description": "Description",
+        "Duration": "Duration",
+        "DurationUnit": "Duration unit",
+        "Category": "Category",
+        "Status": "Status",
+        "MaxEnrollments": "Maximum enrollments",
+        "CurrentEnrollments": "Current enrollments"
+      },
+      "searchFields": ["CourseName", "CourseCode", "Category"]
+    },
+    "learningEnrollments": {
+      "endpoint": "/learningEnrollments",
+      "description": "Learning enrollments",
+      "dependsOn": {"PersonId": "workers", "CourseId": "learningCourses"},
+      "fields": {
+        "EnrollmentId": "Enrollment ID",
+        "PersonId": "Person ID",
+        "PersonNumber": "Person number",
+        "CourseId": "Course ID",
+        "CourseName": "Course name",
+        "EnrollmentStatus": "Status",
+        "CompletionDate": "Completion date",
+        "Score": "Score",
+        "PassStatus": "Pass/fail status",
+        "EnrollmentDate": "Enrollment date"
+      },
+      "searchFields": ["EnrollmentStatus", "CourseName", "PersonNumber"]
+    },
+    "allocatedChecklists": {
+      "endpoint": "/allocatedChecklists",
+      "description": "Person checklists and tasks",
+      "dependsOn": {"PersonId": "workers"},
+      "fields": {
+        "ChecklistId": "Checklist ID",
+        "PersonId": "Person ID",
+        "PersonNumber": "Person number",
+        "ChecklistName": "Checklist name",
+        "ChecklistType": "Checklist type",
+        "Status": "Status",
+        "StartDate": "Start date",
+        "DueDate": "Due date",
+        "CompletionDate": "Completion date",
+        "AssignedToName": "Assigned to name"
+      },
+      "searchFields": ["ChecklistName", "ChecklistType", "Status", "PersonNumber"]
+    },
+    "checklistTasks": {
+      "endpoint": "/allocatedChecklists/{ChecklistId}/child/allocatedTasks",
+      "description": "Checklist tasks",
+      "dependsOn": {"ChecklistId": "allocatedChecklists"},
+      "fields": {
+        "TaskId": "Task ID",
+        "TaskName": "Task name",
+        "Status": "Status",
+        "DueDate": "Due date",
+        "CompletionDate": "Completion date",
+        "AssignedToName": "Assigned to name",
+        "Comments": "Comments"
+      },
+      "searchFields": ["TaskName", "Status"]
+    }
+  },
+  "fieldMappings": {
+    "personId": ["PersonId", "PersonID", "personId", "person_id"],
+    "personNumber": ["PersonNumber", "PersonNum", "EmployeeNumber", "EmployeeId"],
+    "departmentId": ["DepartmentId", "DeptId", "department_id"],
+    "jobId": ["JobId", "job_id"],
+    "locationId": ["LocationId", "location_id"],
+    "positionId": ["PositionId", "position_id"],
+    "absenceTypeId": ["AbsenceTypeId", "absence_type_id"],
+    "benefitPlanId": ["BenefitPlanId", "plan_id"],
+    "courseId": ["CourseId", "course_id"],
+    "checklistId": ["ChecklistId", "checklist_id"]
+  }
+}
