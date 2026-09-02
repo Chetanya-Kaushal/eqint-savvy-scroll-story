@@ -1,5 +1,6 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import { registerPlatformAdminRoutes } from './routes/platform-admin';
+import { registerTenantAdminRoutes } from './routes/tenant-admin';
 
 export function buildServer(): FastifyInstance {
   const server = Fastify({ logger: true });
@@ -7,6 +8,7 @@ export function buildServer(): FastifyInstance {
   server.get('/health', async () => ({ status: 'ok' }));
 
   registerPlatformAdminRoutes(server);
+  registerTenantAdminRoutes(server);
 
   return server;
 }
