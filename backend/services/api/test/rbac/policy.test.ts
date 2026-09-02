@@ -1,7 +1,28 @@
 import { describe, it, expect } from 'vitest';
 import Fastify from 'fastify';
-import { requireRole } from '../../src/rbac/policy';
+import { requireRole, requireAuth } from '../../src/rbac/policy';
 import { issueSessionToken } from '../../src/auth/session';
+
+describe('requireAuth', () => {
+  it('allows any authenticated role and attaches session claims', async () => {
+    process.env.SESSION_JWT_SECRET = 'test-secret';
+    const server = Fastify();
+    server.get('/me', { preHandler: requireAuth }, async (request) => (request as any).session);
+    const token = issueSessionToken({ id: 'u1', tenantId: 't1', role: 'employee' });
+
+    const response = await server.inject({ method: 'GET', url: '/me', headers: { authorization: `Bearer ${token}` } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ userId: 'u1', tenantId: 't1', role: 'employee' });
+  });
+
+  it('rejects a missing token', async () => {
+    process.env.SESSION_JWT_SECRET = 'test-secret';
+    const server = Fastify();
+    server.get('/me', { preHandler: requireAuth }, async (request) => (request as any).session);
+    const response = await server.inject({ method: 'GET', url: '/me' });
+    expect(response.statusCode).toBe(401);
+  });
+});
 
 describe('requireRole', () => {
   it('allows a request whose session role matches', async () => {

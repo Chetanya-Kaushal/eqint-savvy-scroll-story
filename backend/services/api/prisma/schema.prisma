@@ -67,3 +67,13 @@ model AuditLog {
 
   @@index([tenantId])
 }
+
+model ConversationEntry {
+  id        String   @id @default(uuid())
+  userId    String
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}

@@ -1,5 +1,13 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { verifySessionToken } from '../auth/session';
+import { verifySessionToken, SessionClaims } from '../auth/session';
+
+export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
+  const header = request.headers.authorization;
+  if (!header?.startsWith('Bearer ')) return reply.code(401).send({ error: 'Missing bearer token' });
+  const claims = verifySessionToken(header.slice('Bearer '.length));
+  if (!claims) return reply.code(401).send({ error: 'Invalid or expired token' });
+  (request as FastifyRequest & { session: SessionClaims }).session = claims;
+}
 
 export function requireRole(role: string) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
