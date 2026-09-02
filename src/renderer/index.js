@@ -527,7 +527,11 @@ function buildPersonProfileHTML(item) {
     const row = `<div class="data-row"><span class="data-field-label">${escapeHtml(field.label)}</span><span class="data-field">${value}</span></div>`;
     (field.section === 'personal' ? personalRows : employmentRows).push(row);
   }
-  let html = `<div class="data-section"><div class="data-header"><span class="data-icon">&#9679;</span> <b>${escapeHtml(name)}</b></div>`;
+  // PersonNumber is a business employee code, not an internal surrogate key like
+  // PersonId - shown here so the profile card can actually answer "what's their
+  // person number" instead of forcing the user to hunt for it elsewhere.
+  const personNumber = item.PersonNumber ? ` <span style="color:#94a3b8;font-weight:400;">(${escapeHtml(item.PersonNumber)})</span>` : '';
+  let html = `<div class="data-section"><div class="data-header"><span class="data-icon">&#9679;</span> <b>${escapeHtml(name)}</b>${personNumber}</div>`;
   if (personalRows.length) html += `<div class="data-subheader">Personal details</div>${personalRows.join('')}`;
   if (employmentRows.length) html += `<div class="data-subheader">Work details</div>${employmentRows.join('')}`;
   if (!personalRows.length && !employmentRows.length) html += `<div class="data-row">No additional details are available for this person.</div>`;
@@ -552,7 +556,12 @@ const HTML_FORMATTERS = {
   },
   '/workers': (w, idx) => {
     const name = pickDisplayLabel(w) || 'Team member';
-    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name)}</b></span></div>`;
+    // PersonNumber is a business employee code (e.g. "NM1658"), not a sensitive
+    // internal surrogate key like PersonId - showing it is what lets someone actually
+    // look this person up again, so it's shown deliberately, unlike PersonId/
+    // AssignmentId/PayrollRelationshipId etc. which never appear anywhere in the UI.
+    const personNumber = w.PersonNumber ? ` <span class="data-field" style="color:#94a3b8;">(${escapeHtml(w.PersonNumber)})</span>` : '';
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name)}</b></span>${personNumber}</div>`;
   },
   '/absences': (a, idx) => {
     const type = a.AbsenceType || a.absenceType || a.AbsenceTypeName || a.absenceTypeName || '';
@@ -681,7 +690,7 @@ CRITICAL RULES:
 7. Never include instructions about how to use APIs - just show the data.
 8. Be brief and direct. No extra words.
 9. NEVER output raw JSON, curly braces, or anything that looks like code. If you catch yourself about to write "{", stop and rephrase the same information as a short sentence or bullet point instead.
-10. NEVER show any ID number, code, or system field name (PersonId, PersonNumber, AssignmentId, etc.) anywhere in your response. If a name is not available, say "this person" instead of showing an ID.
+10. NEVER show an internal system ID (PersonId, AssignmentId, PayrollRelationshipId, or any long numeric surrogate key) anywhere in your response - those are meaningless database keys, not something a person would recognize. A person's Person Number (a short code like "NM1658") is different - it's their actual business employee code, and you should state it plainly if asked "what is their person number" or similar, using the exact value provided. If a name is not available, say "this person" instead of showing an internal ID.
 11. Use the full data provided to answer specific questions (department, job, location, etc.).
 12. Write for someone with zero technical background - plain, everyday words only. No field names, no technical terms, no jargon. Explain things the way you'd explain them to a curious child: simply and warmly.
 13. Keep each person's/record's facts strictly separate. Never blend a detail from one data block with a name or record from a different block, and never let a system field like CreatedBy or LastUpdatedBy (an audit trail of who touched the record, not who it's about) be mistaken for the actual person the record is about.
@@ -769,6 +778,17 @@ CRITICAL RULES:
 
   // Handle no-data
   if (fetchedData.type === 'no-data') {
+    addMessage(fetchedData.text, 'bot');
+    return;
+  }
+
+  // Handle text (no endpoint keyword matched at all — e.g. "Show my details" isn't
+  // recognized because "details" isn't a keyword for any endpoint). Show the
+  // deterministic message directly rather than handing it to the LLM as "context" —
+  // with nothing real to ground it, it doesn't say "I don't know", it invents a
+  // plausible-sounding but entirely fabricated explanation (observed live: an
+  // authoritative-looking GDPR/privacy-policy refusal that was pure fiction).
+  if (fetchedData.type === 'text') {
     addMessage(fetchedData.text, 'bot');
     return;
   }
