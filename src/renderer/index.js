@@ -215,7 +215,13 @@ async function autoFetchData(userMessage) {
     return { type: 'error', text: '[ERROR] Oracle Fusion not configured. Set URL, username, and password in Settings.' };
   }
 
-  const endpoints = HCM_ENDPOINTS.filter(ep => ep.keywords.some(kw => msg.includes(kw)));
+  let endpoints = HCM_ENDPOINTS.filter(ep => ep.keywords.some(kw => msg.includes(kw)));
+
+  // Skip absence records unless user explicitly asks about absences
+  const absenceExplicit = /\babsence\b|\bleave\b|\btime off\b|\bvacation\b|\bsick\b|\babsences\b|\bleaves\b/i.test(userMessage);
+  if (!absenceExplicit) {
+    endpoints = endpoints.filter(ep => ep.path !== '/absences');
+  }
 
   if (endpoints.length === 0) {
     const ctx = getDiscoveryContext();
@@ -374,23 +380,19 @@ function getDiscoveryContext() {
 const FORMATTERS = {
   '/workers': (w) => {
     const name = w.DisplayName || ((w.FirstName || '') + ' ' + (w.LastName || '')).trim() || 'N/A';
-    return `Name: ${name} | Person#: ${w.PersonNumber || 'N/A'} | Dept: ${w.DepartmentName || 'N/A'} | Job: ${w.JobName || w.PositionName || 'N/A'} | Location: ${w.LocationName || 'N/A'} | Status: ${w.EmploymentStatus || w.WorkerType || 'N/A'}`;
+    return name;
   },
-  '/absences': (a) => `Type: ${a.AbsenceType || a.AbsenceTypeName || 'N/A'} | From: ${a.StartDate || 'N/A'} | To: ${a.EndDate || 'N/A'} | Days: ${a.AbsenceDays || a.Duration || 'N/A'} | Status: ${a.AbsenceStatus || a.ApprovalStatus || 'N/A'} | Employee: ${a.PersonNumber || 'N/A'}`,
-  '/departments': (d) => `Name: ${d.Name || 'N/A'} | Code: ${d.DepartmentCode || 'N/A'} | Manager: ${d.ManagerName || 'N/A'} | Location: ${d.LocationName || 'N/A'}`,
-  '/locations': (l) => `Name: ${l.Name || 'N/A'} | Code: ${l.LocationCode || 'N/A'} | City: ${l.City || 'N/A'} | Country: ${l.Country || 'N/A'}`,
-  '/jobs': (j) => `Name: ${j.Name || 'N/A'} | Code: ${j.JobCode || 'N/A'} | Family: ${j.JobFamilyName || 'N/A'} | Level: ${j.JobLevel || 'N/A'}`,
-  '/positions': (p) => `Name: ${p.Name || 'N/A'} | Code: ${p.PositionCode || 'N/A'} | Dept: ${p.DepartmentName || 'N/A'} | Job: ${p.JobName || 'N/A'}`,
-  '/grades': (g) => `Name: ${g.Name || 'N/A'} | Code: ${g.GradeCode || 'N/A'} | Ladder: ${g.GradeLadderName || 'N/A'}`,
-  '/timeCards': (t) => `Employee: ${t.EmployeeName || 'N/A'} | Person#: ${t.PersonNumber || 'N/A'} | Start: ${t.DateStart || 'N/A'} | End: ${t.DateEnd || 'N/A'} | Hours: ${t.TotalRegHours || 'N/A'} | Status: ${t.StatusCode || 'N/A'}`,
-  '/payrollRelationships': (p) => `Person#: ${p.PersonNumber || 'N/A'} | Name: ${p.EmployeeName || 'N/A'} | Status: ${p.Status || 'N/A'}`,
-  '/allocatedChecklists': (c) => `Name: ${c.ChecklistName || 'N/A'} | Person#: ${c.PersonNumber || 'N/A'} | Status: ${c.Status || 'N/A'} | Due: ${c.DueDate || 'N/A'}`,
-  '/areasOfResponsibility': (r) => `Type: ${r.ResponsibilityType || 'N/A'} | Person#: ${r.PersonNumber || 'N/A'} | Name: ${r.PersonName || 'N/A'}`,
-  '/assignmentStatuses': (s) => `Name: ${s.Name || 'N/A'} | Code: ${s.AssignmentStatusCode || 'N/A'}`,
-  '/workerLocations': (l) => `Person#: ${l.PersonNumber || 'N/A'} | Location: ${l.LocationName || 'N/A'}`,
-  '/workerPhones': (p) => `Person#: ${p.PersonNumber || 'N/A'} | Type: ${p.PhoneType || 'N/A'} | Number: ${p.PhoneNumber || 'N/A'}`,
-  '/workerEmails': (e) => `Person#: ${e.PersonNumber || 'N/A'} | Type: ${e.EmailType || 'N/A'} | Email: ${e.EmailAddress || 'N/A'}`,
-  '/workerAddresses': (a) => `Person#: ${a.PersonNumber || 'N/A'} | Type: ${a.AddressType || 'N/A'} | City: ${a.City || 'N/A'} | Country: ${a.Country || 'N/A'}`,
+  '/absences': (a) => `${a.AbsenceType || a.AbsenceTypeName || 'N/A'} — ${a.StartDate || 'N/A'}`,
+  '/organizations': (d) => d.Name || d.OrganizationName || 'N/A',
+  '/locations': (l) => l.Name || 'N/A',
+  '/jobs': (j) => j.Name || 'N/A',
+  '/positions': (p) => p.Name || 'N/A',
+  '/grades': (g) => g.Name || 'N/A',
+  '/timeRecords': (t) => t.EmployeeName || t.WorkerName || 'N/A',
+  '/payrollRelationships': (p) => p.EmployeeName || p.PersonNumber || 'N/A',
+  '/allocatedChecklists': (c) => c.ChecklistName || 'N/A',
+  '/areasOfResponsibility': (r) => r.ResponsibilityType || r.PersonName || 'N/A',
+  '/assignmentStatuses': (s) => s.Name || 'N/A',
 };
 
 // ── Pretty formatters for chat display ──
@@ -430,64 +432,74 @@ function formatDate(d) {
 }
 
 function formatItemAsHTML(path, item, idx) {
-  // Show ALL non-object, non-underscore fields from the item
+  const name = item.DisplayName || item.displayName
+    || item.Name || item.name
+    || item.AbsenceTypeName || item.absenceTypeName
+    || item.EmployeeName || item.employeeName
+    || item.ChecklistName || item.checklistName
+    || ((item.FirstName || item.firstName || '') + ' ' + (item.LastName || item.lastName || '')).trim();
+  if (name) return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name)}</b></span></div>`;
   const keys = Object.keys(item).filter(k => !k.startsWith('_') && typeof item[k] !== 'object');
-  if (keys.length === 0) {
-    const raw = JSON.stringify(item).slice(0, 150);
-    return `<div class="data-row"><span class="data-idx">#${idx}</span> <span class="data-field">${escapeHtml(raw)}...</span></div>`;
-  }
-  return `<div class="data-row"><span class="data-idx">#${idx}</span> ${keys.slice(0, 6).map(k => `<span class="data-field"><b>${prettifyFieldName(k)}:</b> ${escapeHtml(item[k])}</span>`).join(' &middot; ')}</div>`;
+  if (keys.length === 0) return `<div class="data-row"><span class="data-idx">#${idx}</span></div>`;
+  return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(item[keys[0]])}</b></span></div>`;
 }
 
 const HTML_FORMATTERS = {
   '/absenceTypesLOV': (t, idx) => {
     const name = t.AbsenceTypeName || t.absenceTypeName || t.Name || t.name || '';
-    const desc = t.Description || t.description || '';
-    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name || '—')}</b></span>${desc ? ' <span class="data-field" style="color:#64748b;">' + escapeHtml(desc) + '</span>' : ''}</div>`;
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name || '—')}</b></span></div>`;
   },
   '/workers': (w, idx) => {
     const name = w.DisplayName || w.displayName || ((w.FirstName || w.firstName || '') + ' ' + (w.LastName || w.lastName || '')).trim();
-    const dept = w.DepartmentName || w.departmentName || w.Department || '';
-    const job = w.JobName || w.jobName || w.PositionName || w.positionName || '';
-    const loc = w.LocationName || w.locationName || '';
-    const status = w.EmploymentStatus || w.employmentStatus || w.WorkerType || w.workerType || '';
     if (!name || name === ' ') {
-      // Fallback: show first 4 fields of raw data
-      const keys = Object.keys(w).filter(k => !k.startsWith('_') && typeof w[k] !== 'object').slice(0, 4);
-      return `<div class="data-row"><span class="data-idx">#${idx}</span> ${keys.map(k => `<span class="data-field"><b>${prettifyFieldName(k)}:</b> ${escapeHtml(w[k])}</span>`).join(' &middot; ')}</div>`;
+      const keys = Object.keys(w).filter(k => !k.startsWith('_') && typeof w[k] !== 'object').slice(0, 1);
+      return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(keys.length ? w[keys[0]] : '?')}</b></span></div>`;
     }
-    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name)}</b></span> <span class="data-field">Dept: ${escapeHtml(dept || '—')}</span> <span class="data-field">Job: ${escapeHtml(job || '—')}</span> <span class="data-field">Location: ${escapeHtml(loc || '—')}</span> <span class="data-tag">${escapeHtml(status || '—')}</span></div>`;
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name)}</b></span></div>`;
   },
   '/absences': (a, idx) => {
     const type = a.AbsenceType || a.absenceType || a.AbsenceTypeName || a.absenceTypeName || '';
     const start = a.StartDate || a.startDate || '';
-    const end = a.EndDate || a.endDate || '';
-    const days = a.AbsenceDays || a.absenceDays || a.Duration || a.duration || '';
-    const status = a.AbsenceStatus || a.absenceStatus || a.ApprovalStatus || a.approvalStatus || '';
-    if (!type && !start) {
-      const keys = Object.keys(a).filter(k => !k.startsWith('_') && typeof a[k] !== 'object').slice(0, 4);
-      return `<div class="data-row"><span class="data-idx">#${idx}</span> ${keys.map(k => `<span class="data-field"><b>${prettifyFieldName(k)}:</b> ${escapeHtml(a[k])}</span>`).join(' &middot; ')}</div>`;
-    }
-    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(type || '—')}</b></span> <span class="data-field">${formatDate(start)} – ${formatDate(end)}</span> <span class="data-field">${escapeHtml(days || '—')} days</span> <span class="data-tag">${escapeHtml(status || '—')}</span></div>`;
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(type || '—')}</b></span> <span class="data-field">${formatDate(start)}</span></div>`;
   },
   '/organizations': (d, idx) => {
-    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(d.Name || d.OrganizationName || d.OrganizationId || '—')}</b></span> <span class="data-field">Code: ${escapeHtml(d.OrganizationCode || d.DepartmentCode || '—')}</span> <span class="data-field">Manager: ${escapeHtml(d.ManagerName || '—')}</span> <span class="data-field">Location: ${escapeHtml(d.LocationName || '—')}</span></div>`;
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(d.Name || d.OrganizationName || '—')}</b></span></div>`;
   },
   '/locations': (l, idx) => {
-    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(l.Name || '—')}</b></span> <span class="data-field">Code: ${escapeHtml(l.LocationCode || '—')}</span> <span class="data-field">City: ${escapeHtml(l.City || '—')}</span> <span class="data-field">Country: ${escapeHtml(l.Country || '—')}</span></div>`;
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(l.Name || '—')}</b></span></div>`;
   },
   '/jobs': (j, idx) => {
-    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(j.Name || '—')}</b></span> <span class="data-field">Code: ${escapeHtml(j.JobCode || '—')}</span> <span class="data-field">Family: ${escapeHtml(j.JobFamilyName || '—')}</span> <span class="data-field">Level: ${escapeHtml(j.JobLevel || '—')}</span></div>`;
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(j.Name || '—')}</b></span></div>`;
   },
   '/positions': (p, idx) => {
-    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(p.Name || '—')}</b></span> <span class="data-field">Code: ${escapeHtml(p.PositionCode || '—')}</span> <span class="data-field">Dept: ${escapeHtml(p.DepartmentName || '—')}</span> <span class="data-field">Job: ${escapeHtml(p.JobName || '—')}</span></div>`;
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(p.Name || '—')}</b></span></div>`;
   },
   '/grades': (g, idx) => {
-    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(g.Name || '—')}</b></span> <span class="data-field">Code: ${escapeHtml(g.GradeCode || '—')}</span> <span class="data-field">Ladder: ${escapeHtml(g.GradeLadderName || '—')}</span></div>`;
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(g.Name || '—')}</b></span></div>`;
   },
   '/timeRecords': (t, idx) => {
-    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(t.EmployeeName || t.WorkerName || '—')}</b></span> <span class="data-field">${formatDate(t.DateStart || t.StartTime)} – ${formatDate(t.DateEnd || t.EndTime)}</span> <span class="data-field">${escapeHtml(t.TotalRegHours || t.Hours || '—')} hrs</span> <span class="data-tag">${escapeHtml(t.StatusCode || t.Status || '—')}</span></div>`;
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(t.EmployeeName || t.WorkerName || '—')}</b></span></div>`;
   },
+};
+
+const SUGGESTIONS = {
+  '/workers': 'You can ask about their absences, department, job, location, payroll, phone, email, or address.',
+  '/organizations': 'You can ask about workers in this department, or its location and manager.',
+  '/locations': 'You can ask about workers at this location.',
+  '/jobs': 'You can ask about positions, grades, or workers with this job.',
+  '/positions': 'You can ask about the department, job, or workers in this position.',
+  '/grades': 'You can ask about grade rates, grade ladders, or workers at this grade.',
+  '/absences': 'You can ask about absence types, absence plans, or specific employee absences.',
+  '/absenceTypesLOV': 'You can ask about absence records for a specific type.',
+  '/timeRecords': 'You can ask about a specific employee\'s time records.',
+  '/payrollRelationships': 'You can ask about salaries, element entries, or pay advances.',
+  '/benefitEnrollments': 'You can ask about benefit groups, enrollment opportunities, or plan comparisons.',
+  '/performanceGoals': 'You can ask about goal plans, goal progress, or performance evaluations.',
+  '/learnerLearningRecords': 'You can ask about learning events or self-paced learning items.',
+  '/journeys': 'You can ask about worker journeys, journey tasks, or journey allocations.',
+  '/recruitingJobRequisitions': 'You can ask about job applications, candidates, or job offers.',
+  '/tasks': 'You can ask about pending approvals or workflow notifications.',
+  '/documentRecords': 'You can ask about specific document types or delivery preferences.',
 };
 
 function buildFormattedList(epName, epPath, items, maxShow = 10, isTypeList = false) {
@@ -505,6 +517,8 @@ function buildFormattedList(epName, epPath, items, maxShow = 10, isTypeList = fa
     if (total > maxShow) {
       html += `<div class="data-more">${total - maxShow} more types not shown.</div>`;
     }
+    const hint = SUGGESTIONS[epPath];
+    if (hint) html += `<div class="data-more" style="color:#818cf8;margin-top:4px;">${escapeHtml(hint)}</div>`;
     html += '</div></div>';
     return html;
   }
@@ -517,6 +531,8 @@ function buildFormattedList(epName, epPath, items, maxShow = 10, isTypeList = fa
   if (total > maxShow) {
     html += `<div class="data-more">${total - maxShow} more records not shown. Ask me to "show all ${epName.toLowerCase()}" to see the full list.</div>`;
   }
+  const hint = SUGGESTIONS[epPath];
+  if (hint) html += `<div class="data-more" style="color:#818cf8;margin-top:4px;">${escapeHtml(hint)}</div>`;
   html += '</div>';
   return html;
 }
