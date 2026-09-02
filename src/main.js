@@ -150,7 +150,12 @@ ipcMain.handle('oracle-api', async (e, { url, user, pass }) => {
           resolve({ ok: false, status: res.statusCode, statusText: res.statusMessage, body: body.slice(0, 500) });
         } else {
           try {
-            resolve({ ok: true, status: res.statusCode, data: JSON.parse(body) });
+            const parsed = JSON.parse(body);
+            // Log first item's keys for diagnostics
+            if (parsed.items && parsed.items.length > 0) {
+              console.log('[Oracle] Response keys:', Object.keys(parsed.items[0]).join(', '));
+            }
+            resolve({ ok: true, status: res.statusCode, data: parsed });
           } catch {
             resolve({ ok: false, status: res.statusCode, statusText: 'Invalid JSON', body: body.slice(0, 500) });
           }

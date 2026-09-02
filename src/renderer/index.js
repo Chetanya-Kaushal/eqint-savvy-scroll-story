@@ -398,16 +398,13 @@ function formatDate(d) {
 }
 
 function formatItemAsHTML(path, item, idx) {
-  const fmt = HTML_FORMATTERS[path];
-  if (fmt) return fmt(item, idx);
-  // Fallback: show first 4 non-object, non-underscore fields
-  const keys = Object.keys(item).filter(k => !k.startsWith('_') && typeof item[k] !== 'object').slice(0, 4);
+  // Show ALL non-object, non-underscore fields from the item
+  const keys = Object.keys(item).filter(k => !k.startsWith('_') && typeof item[k] !== 'object');
   if (keys.length === 0) {
-    // Last resort: show raw JSON preview
-    const raw = JSON.stringify(item).slice(0, 120);
+    const raw = JSON.stringify(item).slice(0, 150);
     return `<div class="data-row"><span class="data-idx">#${idx}</span> <span class="data-field">${escapeHtml(raw)}...</span></div>`;
   }
-  return `<div class="data-row"><span class="data-idx">#${idx}</span> ${keys.map(k => `<span class="data-field"><b>${prettifyFieldName(k)}:</b> ${escapeHtml(item[k])}</span>`).join(' &middot; ')}</div>`;
+  return `<div class="data-row"><span class="data-idx">#${idx}</span> ${keys.slice(0, 6).map(k => `<span class="data-field"><b>${prettifyFieldName(k)}:</b> ${escapeHtml(item[k])}</span>`).join(' &middot; ')}</div>`;
 }
 
 const HTML_FORMATTERS = {
