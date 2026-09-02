@@ -155,6 +155,12 @@ ipcMain.handle('oracle-api', async (e, { url, user, pass }) => {
             // Log first item's keys for diagnostics
             if (parsed.items && parsed.items.length > 0) {
               console.log('[Oracle] Response keys:', Object.keys(parsed.items[0]).join(', '));
+              console.log('[Oracle] Items (' + parsed.items.length + '):');
+              parsed.items.forEach((item, i) => {
+                console.log('  #' + (i + 1), JSON.stringify(item));
+              });
+            } else {
+              console.log('[Oracle] Response (no items):', body.slice(0, 500));
             }
             resolve({ ok: true, status: res.statusCode, data: parsed });
           } catch {
