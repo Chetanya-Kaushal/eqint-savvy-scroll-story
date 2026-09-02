@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, desktopCapturer, Tray, Menu, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, desktopCapturer, Tray, Menu, globalShortcut, session } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 
@@ -38,8 +38,10 @@ function createOverlay() {
     skipTaskbar: true,
     hasShadow: false,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      preload: path.join(__dirname, 'preload', 'index.js'),
     },
   });
 
