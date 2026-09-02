@@ -9,6 +9,9 @@ let settings = {
   alwaysOnTop: true,
 };
 
+let currentUserPersonNumber = null; // Set after first worker lookup
+let currentUserDisplayName = null;
+
 let hcmDiscovery = null;
 let hcmData = null;
 let hcmApis = null;
@@ -54,6 +57,26 @@ async function loadInitialState() {
     }
   } catch (err) {
     console.log('Model version check skipped (Ollama not reachable):', err.message);
+  }
+
+  // Detect current user from Oracle credentials
+  detectCurrentUser();
+}
+
+// Detect current user by matching Oracle username to worker record
+async function detectCurrentUser() {
+  if (!settings.oracleUrl || !settings.oracleUser) return;
+  try {
+    const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&q=UserName=\'' + encodeURIComponent(settings.oracleUser) + '\'&limit=1';
+    const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
+    if (result.ok && result.data?.items?.length > 0) {
+      const me = result.data.items[0];
+      currentUserPersonNumber = me.PersonNumber || me.personNumber;
+      currentUserDisplayName = me.DisplayName || me.displayName || ((me.FirstName || me.firstName || '') + ' ' + (me.LastName || me.lastName || '')).trim();
+      console.log('[Savvy] Current user detected:', currentUserDisplayName, '#', currentUserPersonNumber);
+    }
+  } catch (err) {
+    console.log('[Savvy] Could not detect current user:', err.message);
   }
 }
 
@@ -200,14 +223,23 @@ async function autoFetchData(userMessage) {
     return { type: 'text', text: '[INFO] No specific data matched. Try asking about employees, absences, departments, jobs, grades, time cards, checklists, etc.' };
   }
 
-  // Step 1: Detect Person Number (numeric) in query
+  // Step 1: Detect "my" context — use stored current user
+  const isMyQuery = /\bmy\b|\bme\b|\bmine\b|\bmyself\b/i.test(userMessage);
+  if (isMyQuery && currentUserPersonNumber) {
+    return await fetchDataForPerson({
+      personNumber: currentUserPersonNumber,
+      displayName: currentUserDisplayName || 'You',
+    }, endpoints);
+  }
+
+  // Step 2: Detect Person Number (numeric) in query
   let personNumber = null;
   const pnMatch = msg.match(/person\s*(?:number|#|no\.?)\s*(\d+)/i) || msg.match(/\b(\d{4,})\b/);
   if (pnMatch) {
     personNumber = pnMatch[1];
   }
 
-  // Step 2: Detect person name in query
+  // Step 3: Detect person name in query
   let personName = null;
   if (!personNumber) {
     const nameMatch = msg.match(/(?:for|of|belonging to|assigned to)\s+([a-z][a-z\s]+?)(?:'s|\s|$)/i)
