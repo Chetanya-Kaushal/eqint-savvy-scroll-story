@@ -1,4 +1,3 @@
-const { HCMDiscovery } = require('./hcm-discovery');
 const { classifyOracleError } = require('./access-control');
 const { detectPersonNumber } = require('./person-query-parser');
 const { WORKERS_EXPAND, todayDate, flattenWorkerItem } = require('./worker-profile');
@@ -16,8 +15,6 @@ let currentUserPersonNumber = null; // Set after first worker lookup
 let currentUserPersonId = null;
 let currentUserDisplayName = null;
 
-let hcmDiscovery = null;
-let hcmData = null;
 let hcmApis = null;
 let knowledgeBase = [];
 let conversationHistory = [];
@@ -235,8 +232,6 @@ async function autoFetchData(userMessage) {
   }
 
   if (endpoints.length === 0) {
-    const ctx = getDiscoveryContext();
-    if (ctx) return { type: 'text', text: ctx };
     return { type: 'text', text: '[INFO] No specific data matched. Try asking about employees, absences, departments, jobs, grades, time, payroll, benefits, goals, learning, recruiting, etc.' };
   }
 
@@ -420,21 +415,6 @@ function formatItem(path, item) {
   // Fallback: show key fields only
   const keys = Object.keys(item).filter(k => !k.startsWith('_') && typeof item[k] !== 'object');
   return keys.slice(0, 6).map(k => `${k}: ${item[k]}`).join(' | ');
-}
-
-function getDiscoveryContext() {
-  const parts = [];
-  for (const ep of HCM_ENDPOINTS) {
-    const items = discoveryData[ep.path];
-    if (items && items.length > 0) {
-      parts.push(`[ORACLE DATA — ${ep.name}] ${items.length} records:`);
-      items.slice(0, 3).forEach((item, i) => {
-        const formatted = formatItem(ep.path, item);
-        parts.push(`  ${i + 1}. ${formatted}`);
-      });
-    }
-  }
-  return parts.length > 0 ? '\n' + parts.join('\n') : '';
 }
 
 const FORMATTERS = {
@@ -797,14 +777,6 @@ CRITICAL RULES:
     fullMsg = '[RELEVANT REST APIS]\n' + apiResults + '\n\n' + fullMsg;
   }
 
-  const summary = hcmDiscovery ? hcmDiscovery.buildSummary() : '';
-  const searchResult = hcmDiscovery ? hcmDiscovery.searchContext(msg) : '';
-  if (searchResult) {
-    fullMsg = '[MATCHING HCM DATA]\n' + searchResult + '\n\n' + fullMsg;
-  } else if (summary) {
-    fullMsg = '[ORGANIZATION SUMMARY]\n' + summary.substring(0, 3000) + '\n\n' + fullMsg;
-  }
-
   const kb = findKnowledge(msg);
   if (kb) {
     fullMsg = '[HCM KNOWLEDGE]\n' + kb + '\n\n' + fullMsg;
@@ -862,10 +834,6 @@ CRITICAL RULES:
   conversationHistory.push({ role: 'bot', content: fullText || reply, timestamp: Date.now() });
   try { await window.savvy.saveConversationHistory(conversationHistory.slice(-100)); } catch {}
 }
-
-// ── Understand (HCM Discovery) ──
-let discoveryData = {};
-let discoveryInterval = null;
 
 const HCM_ENDPOINTS = [
   // ── Core HR & Workforce ──
@@ -1010,115 +978,6 @@ const HCM_ENDPOINTS = [
   { name: 'Career Interests', path: '/careerInterests', params: '?onlyData=true&limit=20', keywords: ['career interest', 'job interest', 'career preference'] },
   { name: 'Mass Assignments', path: '/massAssignmentChangeDashboard', params: '?onlyData=true&limit=20', keywords: ['mass assignment', 'bulk change', 'mass change'] },
 ];
-
-async function runDiscovery() {
-  const btn = document.getElementById('understandBtn');
-  const progressDiv = document.getElementById('understand-progress');
-  const statusDiv = document.getElementById('understand-status');
-  const summaryDiv = document.getElementById('understand-summary');
-
-  if (!settings.oracleUrl || !settings.oracleUser || !settings.oraclePass) {
-    statusDiv.style.display = 'block';
-    statusDiv.style.background = '#fef2f2';
-    statusDiv.style.border = '1px solid #fecaca';
-    statusDiv.style.color = '#991b1b';
-    statusDiv.textContent = 'Oracle Fusion not configured. Set URL, username, and password in Settings.';
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = 'Discovering...';
-  progressDiv.style.display = 'block';
-  progressDiv.innerHTML = '';
-  statusDiv.style.display = 'none';
-  summaryDiv.style.display = 'none';
-
-  let totalRecords = 0;
-  let successCount = 0;
-  let failCount = 0;
-  const fetchedData = {};
-
-  for (const ep of HCM_ENDPOINTS) {
-    const line = document.createElement('div');
-    line.style.cssText = 'font-size:11px;color:#64748b;padding:2px 0;';
-    line.textContent = `\u25CB ${ep.name}...`;
-    progressDiv.appendChild(line);
-
-    try {
-      const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
-      console.log('[Discovery] Fetching:', url);
-      const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
-      if (!result.ok) {
-        throw new Error('HTTP ' + result.status + ' ' + (result.statusText || '') + (result.body ? ' — ' + result.body.slice(0, 150) : ''));
-      }
-      const rawItems = result.data?.items || [];
-      const items = ep.path === '/workers' ? rawItems.map(flattenWorkerItem) : rawItems;
-      fetchedData[ep.path] = items;
-      totalRecords += items.length;
-      successCount++;
-      line.textContent = `\u2713 ${ep.name}: ${items.length} records`;
-      line.style.color = '#166534';
-    } catch (err) {
-      console.error('[Discovery] Failed:', ep.name, err.message);
-      failCount++;
-      line.textContent = `\u2717 ${ep.name}: ${err.message}`;
-      line.style.color = '#991b1b';
-    }
-    progressDiv.scrollTop = progressDiv.scrollHeight;
-  }
-
-  discoveryData = fetchedData;
-
-  statusDiv.style.display = 'block';
-  if (failCount === 0) {
-    statusDiv.style.background = '#f0fdf4';
-    statusDiv.style.border = '1px solid #bbf7d0';
-    statusDiv.style.color = '#166534';
-    statusDiv.textContent = `Done! ${successCount}/${HCM_ENDPOINTS.length} endpoints OK, ${totalRecords} total records. Auto-refreshes every 5 min.`;
-  } else {
-    statusDiv.style.background = '#fffbeb';
-    statusDiv.style.border = '1px solid #fde68a';
-    statusDiv.style.color = '#92400e';
-    statusDiv.textContent = `Partial: ${successCount} OK, ${failCount} failed, ${totalRecords} records. Auto-refreshes every 5 min.`;
-  }
-
-  // Start auto-refresh every 5 minutes
-  if (discoveryInterval) clearInterval(discoveryInterval);
-  discoveryInterval = setInterval(runDiscoverySilent, 5 * 60 * 1000);
-
-  btn.disabled = false;
-  btn.textContent = 'Re-Discover Now';
-}
-
-async function runDiscoverySilent() {
-  if (!settings.oracleUrl || !settings.oracleUser || !settings.oraclePass) return;
-  const fetchedData = {};
-  for (const ep of HCM_ENDPOINTS) {
-    try {
-      const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
-      const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
-      if (!result.ok) continue;
-      const rawItems = result.data?.items || [];
-      fetchedData[ep.path] = ep.path === '/workers' ? rawItems.map(flattenWorkerItem) : rawItems;
-    } catch {}
-  }
-  discoveryData = fetchedData;
-  console.log('[Discovery] Auto-refreshed', Object.keys(fetchedData).length, 'endpoints');
-}
-
-function getDiscoveryContext() {
-  const parts = [];
-  for (const ep of HCM_ENDPOINTS) {
-    const items = discoveryData[ep.path];
-    if (items && items.length > 0) {
-      parts.push(`[${ep.name} - ${items.length} records]`);
-      items.slice(0, 3).forEach((item, i) => {
-        parts.push(`  ${i + 1}. ${JSON.stringify(item).slice(0, 300)}`);
-      });
-    }
-  }
-  return parts.length > 0 ? parts.join('\n') : '';
-}
 
 // ── Read Page (Vision) ──
 let selectedWindow = null;
@@ -1511,13 +1370,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  document.getElementById('understandSectionHeader').addEventListener('click', () => {
-    const header = document.getElementById('understandSectionHeader');
-    const content = document.getElementById('understandSectionContent');
-    header.classList.toggle('expanded');
-    content.classList.toggle('expanded');
-  });
-
   // Chat
   document.getElementById('sendBtn').addEventListener('click', sendMessage);
   document.getElementById('chatInput').addEventListener('keydown', e => {
@@ -1559,9 +1411,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       startLiveRead();
     }
   });
-
-  // Understand button
-  document.getElementById('understandBtn').addEventListener('click', runDiscovery);
 
   // Save settings
   document.getElementById('saveBtn').addEventListener('click', async () => {

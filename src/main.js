@@ -62,6 +62,7 @@ function createOverlay() {
     y: posY,
     frame: false,
     transparent: true,
+    backgroundColor: '#00000000',
     alwaysOnTop: settings.alwaysOnTop,
     resizable: true,
     skipTaskbar: true,
