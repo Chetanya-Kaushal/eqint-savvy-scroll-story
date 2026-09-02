@@ -5,6 +5,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate"
   },

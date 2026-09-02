@@ -8,6 +8,7 @@
     "start": "electron .",
     "build": "npm run prestart && electron-builder --win",
     "build:portable": "electron-builder --win portable",
+    "lint": "eslint src --ext .js",
     "test:e2e": "playwright test tests/",
     "test:unit": "vitest run tests/unit/"
   },
