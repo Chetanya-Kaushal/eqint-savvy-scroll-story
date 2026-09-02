@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('savvy', {
   setSettings: (settings) => ipcRenderer.invoke('set-settings', settings),
   oracleApi: (url, user, pass) => ipcRenderer.invoke('oracle-api', { url, user, pass }),
   captureScreen: () => ipcRenderer.invoke('capture-screen'),
+  getCursorContext: () => ipcRenderer.invoke('get-cursor-context'),
   getWindowSources: () => ipcRenderer.invoke('get-window-sources'),
   captureWindow: (windowId) => ipcRenderer.invoke('capture-window', windowId),
   closeOverlay: () => ipcRenderer.send('close-overlay'),

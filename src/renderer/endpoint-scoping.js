@@ -7,7 +7,7 @@
 const PERSON_SCOPED_PATHS = new Set([
   '/workers', '/emps', '/publicWorkers', '/personNotes', '/hcmContacts', '/areasOfResponsibility',
   '/absences', '/absenceNoEntitlements',
-  '/payrollRelationships', '/elementEntries', '/calculationEntries', '/payAdvances', '/planBalances',
+  '/payrollRelationships', '/elementEntries', '/calculationEntries', '/payAdvances', '/planBalances', '/payslips',
   '/benefitEnrollments', '/benefitEnrollmentOpportunities',
   '/salaries', '/compensationPeerSalaryPercentiles', '/compensationStockProfiles',
   '/timeRecords', '/timeRecordGroups', '/timeAttributes', '/webClockEvents', '/scheduleRequests', '/attendanceViolations',

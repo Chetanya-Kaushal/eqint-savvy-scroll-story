@@ -9,6 +9,7 @@ const { autoUpdater } = require('electron-updater');
 const Sentry = require('@sentry/electron/main');
 const { makeSecureStorage } = require('./main/secure-storage');
 const { loadPolicyConfig } = require('./main/policy-config');
+const { describeCursorRegion } = require('./main/cursor-region');
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({ dsn: process.env.SENTRY_DSN });
@@ -202,6 +203,18 @@ ipcMain.handle('oracle-api', async (e, { url, user, pass }) => {
       resolve({ ok: false, status: 0, statusText: 'Request timed out (15s)', body: '' });
     });
   });
+});
+
+// Coarse cursor awareness for navigation guidance. Electron's desktopCapturer gives a
+// screenshot of another app's window but not that window's exact on-screen pixel
+// bounds (no OS-native window-rect API is available without a native addon), so this
+// can only describe the cursor's position relative to the whole screen, not pixel-
+// precise relative to the captured window's image. Good enough for directional
+// guidance ("move down and to the left"), not for "click exactly here."
+ipcMain.handle('get-cursor-context', () => {
+  const cursor = screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(cursor);
+  return { x: cursor.x, y: cursor.y, region: describeCursorRegion(cursor, display.workArea) };
 });
 
 ipcMain.handle('capture-screen', async () => {

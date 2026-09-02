@@ -13,6 +13,7 @@ let settings = {
 };
 
 let currentUserPersonNumber = null; // Set after first worker lookup
+let currentUserPersonId = null;
 let currentUserDisplayName = null;
 
 let hcmDiscovery = null;
@@ -79,6 +80,7 @@ async function detectCurrentUser() {
     if (result.ok && result.data?.items?.length > 0) {
       const me = flattenWorkerItem(result.data.items[0]);
       currentUserPersonNumber = me.PersonNumber;
+      currentUserPersonId = me.PersonId;
       currentUserDisplayName = me.DisplayName || ((me.FirstName || '') + ' ' + (me.LastName || '')).trim();
       console.log('[Savvy] Current user detected:', currentUserDisplayName, '#', currentUserPersonNumber);
     } else {
@@ -265,6 +267,7 @@ async function autoFetchData(userMessage) {
   if (isMyQuery && currentUserPersonNumber) {
     return await fetchDataForPerson({
       personNumber: currentUserPersonNumber,
+      personId: currentUserPersonId,
       displayName: currentUserDisplayName || 'You',
     }, endpoints);
   }
@@ -289,6 +292,7 @@ async function autoFetchData(userMessage) {
       if (result.ok && result.data?.items?.length > 0) {
         resolvedPersons = result.data.items.map(flattenWorkerItem).map(p => ({
           personNumber: p.PersonNumber,
+          personId: p.PersonId,
           displayName: p.DisplayName || ((p.FirstName || '') + ' ' + (p.LastName || '')).trim(),
           department: p.DepartmentName || '',
           job: p.JobTitle || '',
@@ -303,6 +307,7 @@ async function autoFetchData(userMessage) {
       if (result.ok && result.data?.items?.length > 0) {
         resolvedPersons = result.data.items.map(flattenWorkerItem).map(p => ({
           personNumber: p.PersonNumber,
+          personId: p.PersonId,
           displayName: p.DisplayName || ((p.FirstName || '') + ' ' + (p.LastName || '')).trim(),
           department: p.DepartmentName || '',
           job: p.JobTitle || '',
@@ -343,8 +348,20 @@ async function fetchDataForPerson(person, endpoints) {
     try {
       let url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
       if (person) {
-        const filterField = ep.personFilterField || 'PersonNumber';
-        url += `&q=${filterField}='` + encodeURIComponent(person.personNumber) + '\'';
+        // Some resources (e.g. /payslips) filter by the numeric PersonId rather than
+        // the string PersonNumber business key, and take it unquoted since it's a
+        // number, not a string. Verified live per-resource — see personFilterField
+        // comment on the HCM_ENDPOINTS entries above.
+        if (ep.personFilterUsesPersonId) {
+          if (person.personId === undefined || person.personId === null) {
+            results.push(`[NO ACCESS — ${ep.name}] Can't look this up without an internal person reference for ${person.displayName || 'this person'}.`);
+            continue;
+          }
+          url += `&q=${ep.personFilterField || 'PersonId'}=${person.personId}`;
+        } else {
+          const filterField = ep.personFilterField || 'PersonNumber';
+          url += `&q=${filterField}='` + encodeURIComponent(person.personNumber) + '\'';
+        }
       }
       console.log('[Renderer] Fetching:', ep.name, url);
       const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
@@ -568,6 +585,11 @@ const HTML_FORMATTERS = {
   '/timeRecords': (t, idx) => {
     return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(t.EmployeeName || t.WorkerName || '—')}</b></span></div>`;
   },
+  '/payslips': (p, idx) => {
+    const amount = p.Amount != null ? `${p.Amount} ${p.CurrencyCode || ''}`.trim() : 'Payslip';
+    const date = p.PaymentDate || '';
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(amount)}</b></span> <span class="data-field">${formatDate(date)}</span></div>`;
+  },
 };
 
 const SUGGESTIONS = {
@@ -627,6 +649,7 @@ function buildFormattedList(epName, epPath, items, maxShow = 10, isTypeList = fa
 
 // ── Chat ──
 let pageContext = '';
+let pageCursorRegion = null;
 
 async function sendMessage() {
   const input = document.getElementById('chatInput');
@@ -655,7 +678,16 @@ CRITICAL RULES:
   let fullMsg = msg;
 
   if (pageContext) {
-    fullMsg = '[CURRENT ORACLE PAGE]\n' + pageContext.substring(0, 2000) + '\n\n' + fullMsg;
+    // Refresh the cursor position at chat time, not just when the screenshot was
+    // taken — the user may have moved the mouse since then, and a navigation
+    // question ("where do I click for X") needs their current position.
+    let cursorNote = '';
+    try {
+      const cursor = await window.savvy.getCursorContext();
+      pageCursorRegion = cursor.region;
+      cursorNote = `\n[CURSOR] Currently in the ${pageCursorRegion} area of the screen.`;
+    } catch {}
+    fullMsg = '[CURRENT ORACLE PAGE]\n' + pageContext.substring(0, 2000) + cursorNote + '\n\n' + fullMsg;
   }
 
   // Auto-fetch real data from Oracle HCM based on user intent
@@ -667,8 +699,8 @@ CRITICAL RULES:
     const chooseDiv = document.createElement('div');
     chooseDiv.className = 'msg bot';
     let buttonsHtml = fetchedData.persons.map((p, i) =>
-      `<button class="person-select-btn" data-pn="${escapeHtml(p.personNumber)}" data-name="${escapeHtml(p.displayName)}" data-eps="${escapeHtml(JSON.stringify(fetchedData.endpoints.map(e => e.path)))}" style="display:block;width:100%;text-align:left;padding:8px 12px;margin:4px 0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:12px;border-left:3px solid #0070F3;">
-        <b>${escapeHtml(p.displayName)}</b> &middot; #${escapeHtml(p.personNumber)}${p.department ? ' &middot; ' + escapeHtml(p.department) : ''}
+      `<button class="person-select-btn" data-pn="${escapeHtml(p.personNumber)}" data-pid="${escapeHtml(p.personId ?? '')}" data-name="${escapeHtml(p.displayName)}" data-eps="${escapeHtml(JSON.stringify(fetchedData.endpoints.map(e => e.path)))}" style="display:block;width:100%;text-align:left;padding:8px 12px;margin:4px 0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:12px;border-left:3px solid #0070F3;">
+        <b>${escapeHtml(p.displayName)}</b>${p.department ? ' &middot; ' + escapeHtml(p.department) : ''}${p.job ? ' &middot; ' + escapeHtml(p.job) : ''}
       </button>`
     ).join('');
     chooseDiv.innerHTML = `<div class="msg-avatar">EQ</div><div class="msg-text"><div style="margin-bottom:6px;">${escapeHtml(fetchedData.text)}</div>${buttonsHtml}</div>`;
@@ -679,12 +711,13 @@ CRITICAL RULES:
     chooseDiv.querySelectorAll('.person-select-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const pn = btn.dataset.pn;
+        const pid = btn.dataset.pid ? Number(btn.dataset.pid) : undefined;
         const name = btn.dataset.name;
         const eps = JSON.parse(btn.dataset.eps);
         btn.disabled = true;
         btn.style.opacity = '0.5';
         const epDefs = eps.map(p => HCM_ENDPOINTS.find(e => e.path === p)).filter(Boolean);
-        const person = { personNumber: pn, displayName: name };
+        const person = { personNumber: pn, personId: pid, displayName: name };
         const result = await fetchDataForPerson(person, epDefs);
         if (result.type === 'data' && result.text) {
           // Show the data
@@ -869,6 +902,10 @@ const HCM_ENDPOINTS = [
   { name: 'Flow Patterns', path: '/flowPatterns', params: '?onlyData=true&limit=20', keywords: ['flow pattern', 'payroll process'] },
   { name: 'Pay Advances', path: '/payAdvances', params: '?onlyData=true&limit=20', keywords: ['pay advance', 'salary advance', 'advance request'] },
   { name: 'Plan Balances', path: '/planBalances', params: '?onlyData=true&limit=20', keywords: ['plan balance', 'balance', 'pay balance'] },
+  // Payslips filter by the numeric PersonId, unquoted (confirmed via Oracle's REST
+  // docs and live-verified against a real tenant — query mechanics work correctly
+  // even when the tenant has zero processed payroll runs to return).
+  { name: 'Payslips', path: '/payslips', params: '?onlyData=true&limit=10&orderBy=PaymentDate:desc', personFilterField: 'PersonId', personFilterUsesPersonId: true, keywords: ['payslip', 'pay slip', 'pay stub', 'paycheck', 'payment history', 'net pay'] },
 
   // ── Benefits ──
   { name: 'Benefit Enrollments', path: '/benefitEnrollments', params: '?onlyData=true&limit=20', keywords: ['benefit enrollment', 'benefit', 'enrollment'] },
@@ -1014,7 +1051,8 @@ async function runDiscovery() {
       if (!result.ok) {
         throw new Error('HTTP ' + result.status + ' ' + (result.statusText || '') + (result.body ? ' — ' + result.body.slice(0, 150) : ''));
       }
-      const items = result.data?.items || [];
+      const rawItems = result.data?.items || [];
+      const items = ep.path === '/workers' ? rawItems.map(flattenWorkerItem) : rawItems;
       fetchedData[ep.path] = items;
       totalRecords += items.length;
       successCount++;
@@ -1060,7 +1098,8 @@ async function runDiscoverySilent() {
       const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
       const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
       if (!result.ok) continue;
-      fetchedData[ep.path] = result.data?.items || [];
+      const rawItems = result.data?.items || [];
+      fetchedData[ep.path] = ep.path === '/workers' ? rawItems.map(flattenWorkerItem) : rawItems;
     } catch {}
   }
   discoveryData = fetchedData;
@@ -1172,15 +1211,22 @@ async function captureWindow(source, isLive = false) {
     const visionModel = await detectVisionModel();
 
     if (visionModel) {
+      let cursorNote = '';
+      try {
+        const cursor = await window.savvy.getCursorContext();
+        pageCursorRegion = cursor.region;
+        cursorNote = `\n\nThe user's mouse cursor is currently in the ${cursor.region} area of their screen (note: this is relative to the whole screen, not necessarily this window — use it only for coarse directional guidance, e.g. "move down and to the left", never for exact pixel positions).`;
+      } catch { pageCursorRegion = null; }
+
       const visionPrompt = `Analyze this Oracle Fusion HCM screenshot. List:
 1. Page title and module (e.g., "My Team", "Absences", "Payroll")
 2. All visible field labels and their values
-3. All buttons and links with their labels
+3. All buttons and links with their labels, and roughly where each sits on screen (top/bottom, left/right)
 4. Any tables: list column headers and first 3 rows of data
 5. Any alerts, errors, or notifications
 6. Navigation breadcrumbs or menu path
 
-Be thorough and specific. Use actual text from the screenshot.`;
+Be thorough and specific. Use actual text from the screenshot. If asked later for navigation help, use the on-screen positions you noted here plus the user's cursor location to give simple directions like "move up and to the right toward the Absences tab" — never invent a location you didn't actually see.${cursorNote}`;
 
       const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, '');
 
