@@ -1,7 +1,9 @@
-const { app, BrowserWindow, ipcMain, screen, desktopCapturer, Tray, Menu, globalShortcut, session } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, desktopCapturer, Tray, Menu, globalShortcut, session, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
+const { makeSecureStorage } = require('./main/secure-storage');
+const secureStorage = makeSecureStorage(safeStorage);
 
 const store = new Store({
   defaults: {
@@ -91,10 +93,16 @@ function createTray() {
 }
 
 // IPC handlers
-ipcMain.handle('get-settings', () => store.get('settings'));
+ipcMain.handle('get-settings', () => {
+  const settings = store.get('settings');
+  return { ...settings, oraclePass: secureStorage.decryptField(settings.oraclePass) };
+});
 ipcMain.handle('set-settings', (e, newSettings) => {
   const currentSettings = store.get('settings');
   const updatedSettings = { ...currentSettings, ...newSettings };
+  if (newSettings.oraclePass !== undefined) {
+    updatedSettings.oraclePass = secureStorage.encryptField(newSettings.oraclePass);
+  }
   store.set('settings', updatedSettings);
   return true;
 });
@@ -220,33 +228,24 @@ ipcMain.handle('load-knowledge-base', () => {
 
 ipcMain.handle('load-hcm-data', () => {
   try {
-    const dataPath = path.join(__dirname, '..', 'hcm-data.json');
-    if (fs.existsSync(dataPath)) return JSON.parse(fs.readFileSync(dataPath, 'utf8'));
-  } catch (err) { console.error('Failed to load HCM data:', err); }
-  return null;
+    return secureStorage.readEncryptedFile(path.join(__dirname, '..', 'hcm-data.json'));
+  } catch (err) { console.error('Failed to load HCM data:', err); return null; }
 });
-
 ipcMain.handle('save-hcm-data', (e, data) => {
   try {
-    const dataPath = path.join(__dirname, '..', 'hcm-data.json');
-    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
+    secureStorage.writeEncryptedFile(path.join(__dirname, '..', 'hcm-data.json'), data);
     return true;
   } catch (err) { console.error('Failed to save HCM data:', err); return false; }
 });
 
 ipcMain.handle('get-conversation-history', () => {
   try {
-    const historyPath = path.join(__dirname, '..', 'conversation-history.json');
-    if (fs.existsSync(historyPath)) return JSON.parse(fs.readFileSync(historyPath, 'utf8'));
-  } catch (err) { console.error('Failed to load conversation history:', err); }
-  return [];
+    return secureStorage.readEncryptedFile(path.join(__dirname, '..', 'conversation-history.json')) || [];
+  } catch (err) { console.error('Failed to load conversation history:', err); return []; }
 });
-
 ipcMain.handle('save-conversation-history', (e, history) => {
   try {
-    const historyPath = path.join(__dirname, '..', 'conversation-history.json');
-    const trimmed = history.slice(-50);
-    fs.writeFileSync(historyPath, JSON.stringify(trimmed, null, 2));
+    secureStorage.writeEncryptedFile(path.join(__dirname, '..', 'conversation-history.json'), history.slice(-50));
     return true;
   } catch (err) { console.error('Failed to save conversation history:', err); return false; }
 });
