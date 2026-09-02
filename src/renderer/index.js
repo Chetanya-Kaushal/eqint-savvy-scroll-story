@@ -341,7 +341,10 @@ async function fetchDataForPerson(person, endpoints) {
   const scopedEndpoints = person ? endpoints.filter((ep) => isPersonScoped(ep.path)) : endpoints;
   for (const ep of scopedEndpoints) {
     try {
-      let url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
+      // effectiveDate=today on every fetch so date-tracked (effective-dated) Oracle
+      // records - assignments, absences, salaries, etc. - always reflect the current
+      // date rather than relying on Oracle's implicit default context.
+      let url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params + `&effectiveDate=${todayDate()}`;
       if (person) {
         // Some resources (e.g. /payslips) filter by the numeric PersonId rather than
         // the string PersonNumber business key, and take it unquoted since it's a
@@ -484,7 +487,10 @@ const { pickDisplayLabel } = require('./name-resolver');
 function formatItemAsHTML(path, item, idx, epName) {
   const formatter = HTML_FORMATTERS[path];
   if (formatter) return formatter(item, idx);
-  const label = pickDisplayLabel(item) || (epName ? `${epName.replace(/s$/, '')} record` : 'Record');
+  // epName may already be "Payroll Relationships for Jane Smith" (the header label) -
+  // strip the " for X" suffix so the per-row fallback doesn't repeat the person's name.
+  const baseName = epName ? epName.replace(/ for .+$/, '') : '';
+  const label = pickDisplayLabel(item) || (baseName ? `${baseName.replace(/s$/, '')} record` : 'Record');
   return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(label)}</b></span></div>`;
 }
 
@@ -837,7 +843,7 @@ CRITICAL RULES:
 
 const HCM_ENDPOINTS = [
   // ── Core HR & Workforce ──
-  { name: 'Workers', path: '/workers', params: `?onlyData=true&limit=20&${WORKERS_EXPAND}&effectiveDate=${todayDate()}`, keywords: ['employee', 'worker', 'person', 'team', 'headcount', 'hire', 'name', 'number'] },
+  { name: 'Workers', path: '/workers', params: `?onlyData=true&limit=20&${WORKERS_EXPAND}`, keywords: ['employee', 'worker', 'person', 'team', 'headcount', 'hire', 'name', 'number'] },
   { name: 'Employees', path: '/emps', params: '?onlyData=true&limit=20', keywords: ['emp', 'employee list'] },
   { name: 'Public Workers', path: '/publicWorkers', params: '?onlyData=true&limit=20', keywords: ['public worker', 'public profile'] },
   { name: 'Organizations', path: '/organizations', params: '?onlyData=true&limit=20', keywords: ['department', 'dept', 'org', 'organization', 'division', 'team'] },
@@ -860,12 +866,12 @@ const HCM_ENDPOINTS = [
   { name: 'Absence Types', path: '/absenceTypesLOV', params: '?onlyData=true&limit=50', keywords: ['absence type', 'leave type', 'absence category', 'types of absence', 'types of leave'], isTypeList: true },
   { name: 'Absence Plans', path: '/absencePlansLOV', params: '?onlyData=true&limit=50', keywords: ['absence plan', 'leave plan', 'entitlement'] },
   { name: 'Absence Calendars', path: '/absenceCalendars', params: '?onlyData=true&limit=20', keywords: ['absence calendar', 'leave calendar', 'org calendar'] },
-  { name: 'Absence No Entitlements', path: '/absenceNoEntitlements', params: '?onlyData=true&limit=20', keywords: ['absence no entitlement', 'no entitlement'] },
+  { name: 'Absence No Entitlements', path: '/absenceNoEntitlements', params: '?onlyData=true&limit=20', personFilterField: 'PersonId', personFilterUsesPersonId: true, keywords: ['absence no entitlement', 'no entitlement'] },
 
   // ── Payroll ──
   { name: 'Payroll Relationships', path: '/payrollRelationships', params: '?onlyData=true&limit=20', keywords: ['payroll', 'salary', 'pay', 'wage', 'earnings'] },
   { name: 'Element Entries', path: '/elementEntries', params: '?onlyData=true&limit=20', keywords: ['element entry', 'pay element', 'earning', 'deduction'] },
-  { name: 'Calculation Entries', path: '/calculationEntries', params: '?onlyData=true&limit=20', keywords: ['calculation', 'calc card', 'payroll calculation'] },
+  { name: 'Calculation Entries', path: '/calculationEntries', params: '?onlyData=true&limit=20', personFilterField: 'PersonId', personFilterUsesPersonId: true, keywords: ['calculation', 'calc card', 'payroll calculation'] },
   { name: 'Flow Instances', path: '/flowInstances', params: '?onlyData=true&limit=20', keywords: ['flow instance', 'payroll flow', 'payroll run'] },
   { name: 'Flow Patterns', path: '/flowPatterns', params: '?onlyData=true&limit=20', keywords: ['flow pattern', 'payroll process'] },
   { name: 'Pay Advances', path: '/payAdvances', params: '?onlyData=true&limit=20', keywords: ['pay advance', 'salary advance', 'advance request'] },
@@ -876,14 +882,14 @@ const HCM_ENDPOINTS = [
   { name: 'Payslips', path: '/payslips', params: '?onlyData=true&limit=10&orderBy=PaymentDate:desc', personFilterField: 'PersonId', personFilterUsesPersonId: true, keywords: ['payslip', 'pay slip', 'pay stub', 'paycheck', 'payment history', 'net pay'] },
 
   // ── Benefits ──
-  { name: 'Benefit Enrollments', path: '/benefitEnrollments', params: '?onlyData=true&limit=20', keywords: ['benefit enrollment', 'benefit', 'enrollment'] },
+  { name: 'Benefit Enrollments', path: '/benefitEnrollments', params: '?onlyData=true&limit=20', personFilterField: 'PersonId', personFilterUsesPersonId: true, keywords: ['benefit enrollment', 'benefit', 'enrollment'] },
   { name: 'Benefit Groups', path: '/benefitGroups', params: '?onlyData=true&limit=20', keywords: ['benefit group', 'benefit plan group'] },
   { name: 'Benefit Opportunities', path: '/benefitEnrollmentOpportunities', params: '?onlyData=true&limit=20', keywords: ['benefit opportunity', 'enrollment opportunity'] },
   { name: 'Benefit Year Periods', path: '/benefitYearPeriods', params: '?onlyData=true&limit=20', keywords: ['benefit year', 'benefit period'] },
   { name: 'Benefits Comparison', path: '/benefitPlansComparison', params: '?onlyData=true&limit=20', keywords: ['compare benefits', 'benefit comparison'] },
 
   // ── Compensation ──
-  { name: 'Salaries', path: '/salaries', params: '?onlyData=true&limit=20', keywords: ['salary', 'compensation', 'pay rate', 'annual salary'] },
+  { name: 'Salaries', path: '/salaries', params: '?onlyData=true&limit=20', personFilterField: 'PersonId', personFilterUsesPersonId: true, keywords: ['salary', 'compensation', 'pay rate', 'annual salary'] },
   { name: 'Salary Basis', path: '/salaryBasisLov', params: '?onlyData=true&limit=20', keywords: ['salary basis', 'pay basis'] },
   { name: 'Grade Rates', path: '/gradeRates', params: '?onlyData=true&limit=20', keywords: ['grade rate', 'pay grade', 'salary grade'] },
   { name: 'Grades', path: '/grades', params: '?onlyData=true&limit=20', keywords: ['grade', 'level', 'band', 'job grade'] },
@@ -892,8 +898,8 @@ const HCM_ENDPOINTS = [
   { name: 'Stock Profiles', path: '/compensationStockProfiles', params: '?onlyData=true&limit=20', keywords: ['stock', 'equity', 'stock profile'] },
 
   // ── Time & Labor ──
-  { name: 'Time Records', path: '/timeRecords', params: '?onlyData=true&limit=20', keywords: ['time record', 'time card', 'timesheet', 'hours worked'] },
-  { name: 'Time Record Groups', path: '/timeRecordGroups', params: '?onlyData=true&limit=20', keywords: ['time group', 'time entry group'] },
+  { name: 'Time Records', path: '/timeRecords', params: '?onlyData=true&limit=20', personFilterField: 'personNumber', keywords: ['time record', 'time card', 'timesheet', 'hours worked'] },
+  { name: 'Time Record Groups', path: '/timeRecordGroups', params: '?onlyData=true&limit=20', personFilterField: 'personNumber', keywords: ['time group', 'time entry group'] },
   { name: 'Time Attributes', path: '/timeAttributes', params: '?onlyData=true&limit=20', keywords: ['time attribute', 'time entry'] },
   { name: 'Web Clock Events', path: '/webClockEvents', params: '?onlyData=true&limit=20', keywords: ['clock', 'punch', 'web clock', 'clock in', 'clock out'] },
   { name: 'Schedule Requests', path: '/scheduleRequests', params: '?onlyData=true&limit=20', keywords: ['schedule request', 'shift request', 'schedule change'] },
@@ -923,14 +929,14 @@ const HCM_ENDPOINTS = [
 
   // ── Journeys ──
   { name: 'Journeys', path: '/journeys', params: '?onlyData=true&limit=20', keywords: ['journey', 'journey template', 'onboarding journey'] },
-  { name: 'Worker Journeys', path: '/workerJourneys', params: '?onlyData=true&limit=20', keywords: ['worker journey', 'my journey', 'assigned journey'] },
+  { name: 'Worker Journeys', path: '/workerJourneys', params: '?onlyData=true&limit=20', personFilterField: 'PersonId', personFilterUsesPersonId: true, keywords: ['worker journey', 'my journey', 'assigned journey'] },
   { name: 'Worker Journey Tasks', path: '/workerJourneyTasks', params: '?onlyData=true&limit=20', keywords: ['journey task', 'onboarding task', 'offboarding task'] },
   { name: 'Journey Allocations', path: '/journeyAllocations', params: '?onlyData=true&limit=20', keywords: ['journey allocation', 'journey assignment'] },
   { name: 'Journey Counts', path: '/journeyCounts', params: '?onlyData=true&limit=20', keywords: ['journey count', 'journey summary'] },
 
   // ── Recruiting ──
   { name: 'Job Requisitions', path: '/recruitingJobRequisitions', params: '?onlyData=true&limit=20', keywords: ['requisition', 'job req', 'open position', 'hiring'] },
-  { name: 'Job Applications', path: '/recruitingJobApplications', params: '?onlyData=true&limit=20', keywords: ['job application', 'applicant', 'application'] },
+  { name: 'Job Applications', path: '/recruitingJobApplications', params: '?onlyData=true&limit=20', personFilterField: 'CandidatePersonId', personFilterUsesPersonId: true, keywords: ['job application', 'applicant', 'application'] },
   { name: 'Recruiting Candidates', path: '/recruitingCandidates', params: '?onlyData=true&limit=20', keywords: ['candidate', 'recruiting candidate'] },
   { name: 'Job Offers', path: '/recruitingJobOffers', params: '?onlyData=true&limit=20', keywords: ['job offer', 'offer letter', 'offer'] },
   { name: 'Posted Jobs', path: '/recruitingJobSitePostedJobs', params: '?onlyData=true&limit=20', keywords: ['posted job', 'job posting', 'career site'] },
@@ -943,7 +949,7 @@ const HCM_ENDPOINTS = [
 
   // ── Documents & Communications ──
   { name: 'Document Records', path: '/documentRecords', params: '?onlyData=true&limit=20', keywords: ['document', 'attachment', 'file', 'record'] },
-  { name: 'Communications', path: '/communicateUIMyCommunications', params: '?onlyData=true&limit=20', keywords: ['communication', 'message', 'announcement', 'notification'] },
+  { name: 'Communications', path: '/communicateUIMyCommunications', params: '?onlyData=true&limit=20', personFilterField: 'PersonId', personFilterUsesPersonId: true, keywords: ['communication', 'message', 'announcement', 'notification'] },
   { name: 'Campaigns', path: '/communicateUICampaignDetails', params: '?onlyData=true&limit=20', keywords: ['campaign', 'communication campaign'] },
   { name: 'Questionnaires', path: '/questionnaires', params: '?onlyData=true&limit=20', keywords: ['questionnaire', 'survey', 'form'] },
   { name: 'Questions', path: '/questions', params: '?onlyData=true&limit=20', keywords: ['question', 'survey question'] },
@@ -975,7 +981,7 @@ const HCM_ENDPOINTS = [
   { name: 'Extract Templates', path: '/extractConfiguratorTemplates', params: '?onlyData=true&limit=20', keywords: ['extract', 'template', 'data extract'] },
   { name: 'Workforce Schedules', path: '/workforceScheduleDefinitions', params: '?onlyData=true&limit=20', keywords: ['schedule', 'shift', 'work schedule', 'roster'] },
   { name: 'Incident Kiosks', path: '/incidentKiosks', params: '?onlyData=true&limit=20', keywords: ['incident', 'safety incident', 'workplace incident'] },
-  { name: 'Career Interests', path: '/careerInterests', params: '?onlyData=true&limit=20', keywords: ['career interest', 'job interest', 'career preference'] },
+  { name: 'Career Interests', path: '/careerInterests', params: '?onlyData=true&limit=20', personFilterField: 'PersonId', personFilterUsesPersonId: true, keywords: ['career interest', 'job interest', 'career preference'] },
   { name: 'Mass Assignments', path: '/massAssignmentChangeDashboard', params: '?onlyData=true&limit=20', keywords: ['mass assignment', 'bulk change', 'mass change'] },
 ];
 

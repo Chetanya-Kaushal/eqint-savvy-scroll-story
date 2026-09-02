@@ -13,6 +13,12 @@ describe('isPersonScoped', () => {
     expect(isPersonScoped('/locations')).toBe(false);
     expect(isPersonScoped('/jobs')).toBe(false);
   });
+
+  it('excludes endpoints live-verified to reject every attempted person filter (PersonNumber, personNumber, PersonId)', () => {
+    expect(isPersonScoped('/tasks')).toBe(false);
+    expect(isPersonScoped('/webClockEvents')).toBe(false);
+    expect(isPersonScoped('/recruitingCEInterviewScheduleDetails')).toBe(false);
+  });
 });
 
 describe('scopeEndpointsToPerson', () => {
