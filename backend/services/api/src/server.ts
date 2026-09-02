@@ -9,6 +9,8 @@ export function buildServer(): FastifyInstance {
 }
 
 if (require.main === module) {
+  const { startScheduler } = require('./sync/scheduler');
+  startScheduler();
   const server = buildServer();
   server.listen({ port: 4000, host: '0.0.0.0' }).catch((err) => {
     server.log.error(err);
