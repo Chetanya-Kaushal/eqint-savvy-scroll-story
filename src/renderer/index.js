@@ -220,7 +220,7 @@ async function autoFetchData(userMessage) {
   if (endpoints.length === 0) {
     const ctx = getDiscoveryContext();
     if (ctx) return { type: 'text', text: ctx };
-    return { type: 'text', text: '[INFO] No specific data matched. Try asking about employees, absences, departments, jobs, grades, time cards, checklists, etc.' };
+    return { type: 'text', text: '[INFO] No specific data matched. Try asking about employees, absences, departments, jobs, grades, time, payroll, benefits, goals, learning, recruiting, etc.' };
   }
 
   // Step 1: Detect "my" context — use stored current user
@@ -440,6 +440,11 @@ function formatItemAsHTML(path, item, idx) {
 }
 
 const HTML_FORMATTERS = {
+  '/absenceTypesLOV': (t, idx) => {
+    const name = t.AbsenceTypeName || t.absenceTypeName || t.Name || t.name || '';
+    const desc = t.Description || t.description || '';
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name || '—')}</b></span>${desc ? ' <span class="data-field" style="color:#64748b;">' + escapeHtml(desc) + '</span>' : ''}</div>`;
+  },
   '/workers': (w, idx) => {
     const name = w.DisplayName || w.displayName || ((w.FirstName || w.firstName || '') + ' ' + (w.LastName || w.lastName || '')).trim();
     const dept = w.DepartmentName || w.departmentName || w.Department || '';
@@ -465,8 +470,8 @@ const HTML_FORMATTERS = {
     }
     return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(type || '—')}</b></span> <span class="data-field">${formatDate(start)} – ${formatDate(end)}</span> <span class="data-field">${escapeHtml(days || '—')} days</span> <span class="data-tag">${escapeHtml(status || '—')}</span></div>`;
   },
-  '/departments': (d, idx) => {
-    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(d.Name || '—')}</b></span> <span class="data-field">Code: ${escapeHtml(d.DepartmentCode || '—')}</span> <span class="data-field">Manager: ${escapeHtml(d.ManagerName || '—')}</span> <span class="data-field">Location: ${escapeHtml(d.LocationName || '—')}</span></div>`;
+  '/organizations': (d, idx) => {
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(d.Name || d.OrganizationName || d.OrganizationId || '—')}</b></span> <span class="data-field">Code: ${escapeHtml(d.OrganizationCode || d.DepartmentCode || '—')}</span> <span class="data-field">Manager: ${escapeHtml(d.ManagerName || '—')}</span> <span class="data-field">Location: ${escapeHtml(d.LocationName || '—')}</span></div>`;
   },
   '/locations': (l, idx) => {
     return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(l.Name || '—')}</b></span> <span class="data-field">Code: ${escapeHtml(l.LocationCode || '—')}</span> <span class="data-field">City: ${escapeHtml(l.City || '—')}</span> <span class="data-field">Country: ${escapeHtml(l.Country || '—')}</span></div>`;
@@ -480,14 +485,31 @@ const HTML_FORMATTERS = {
   '/grades': (g, idx) => {
     return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(g.Name || '—')}</b></span> <span class="data-field">Code: ${escapeHtml(g.GradeCode || '—')}</span> <span class="data-field">Ladder: ${escapeHtml(g.GradeLadderName || '—')}</span></div>`;
   },
-  '/timeCards': (t, idx) => {
-    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(t.EmployeeName || '—')}</b></span> <span class="data-field">${formatDate(t.DateStart)} – ${formatDate(t.DateEnd)}</span> <span class="data-field">${escapeHtml(t.TotalRegHours || '—')} hrs</span> <span class="data-tag">${escapeHtml(t.StatusCode || '—')}</span></div>`;
+  '/timeRecords': (t, idx) => {
+    return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(t.EmployeeName || t.WorkerName || '—')}</b></span> <span class="data-field">${formatDate(t.DateStart || t.StartTime)} – ${formatDate(t.DateEnd || t.EndTime)}</span> <span class="data-field">${escapeHtml(t.TotalRegHours || t.Hours || '—')} hrs</span> <span class="data-tag">${escapeHtml(t.StatusCode || t.Status || '—')}</span></div>`;
   },
 };
 
-function buildFormattedList(epName, epPath, items, maxShow = 10) {
+function buildFormattedList(epName, epPath, items, maxShow = 10, isTypeList = false) {
   const total = items.length;
   const showing = Math.min(total, maxShow);
+
+  // Type lists: show as simple bullet list, not numbered rows
+  if (isTypeList) {
+    let html = `<div class="data-section"><div class="data-header"><span class="data-icon">&#9679;</span> <b>${escapeHtml(epName)}</b> — ${total} available</div>`;
+    html += '<div style="padding:4px 8px;">';
+    for (let i = 0; i < showing; i++) {
+      const name = items[i].AbsenceTypeName || items[i].absenceTypeName || items[i].Name || items[i].name || JSON.stringify(items[i]).slice(0, 50);
+      html += `<div style="padding:3px 0;font-size:12px;">&#8226; <b>${escapeHtml(name)}</b></div>`;
+    }
+    if (total > maxShow) {
+      html += `<div class="data-more">${total - maxShow} more types not shown.</div>`;
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  // Regular records: show as numbered rows
   let html = `<div class="data-section"><div class="data-header"><span class="data-icon">&#9679;</span> <b>${escapeHtml(epName)}</b> — ${total} record${total !== 1 ? 's' : ''}</div>`;
   for (let i = 0; i < showing; i++) {
     html += formatItemAsHTML(epPath, items[i], i + 1);
@@ -687,22 +709,136 @@ let discoveryData = {};
 let discoveryInterval = null;
 
 const HCM_ENDPOINTS = [
+  // ── Core HR & Workforce ──
   { name: 'Workers', path: '/workers', params: '?onlyData=true&limit=20', keywords: ['employee', 'worker', 'person', 'team', 'headcount', 'hire', 'name', 'number'] },
-  { name: 'Absences', path: '/absences', params: '?onlyData=true&limit=20', keywords: ['absence', 'leave', 'time off', 'vacation', 'sick'] },
-  { name: 'Allocated Checklists', path: '/allocatedChecklists', params: '?onlyData=true&limit=20', keywords: ['checklist', 'task', 'onboarding', 'offboarding'] },
+  { name: 'Employees', path: '/emps', params: '?onlyData=true&limit=20', keywords: ['emp', 'employee list'] },
+  { name: 'Public Workers', path: '/publicWorkers', params: '?onlyData=true&limit=20', keywords: ['public worker', 'public profile'] },
+  { name: 'Organizations', path: '/organizations', params: '?onlyData=true&limit=20', keywords: ['department', 'dept', 'org', 'organization', 'division', 'team'] },
+  { name: 'Positions', path: '/positions', params: '?onlyData=true&limit=20', keywords: ['position', 'posting', 'job position'] },
+  { name: 'Jobs', path: '/jobs', params: '?onlyData=true&limit=20', keywords: ['job', 'role', 'position title', 'job title'] },
+  { name: 'Locations', path: '/locations', params: '?onlyData=true&limit=20', keywords: ['location', 'office', 'site', 'address', 'workplace'] },
   { name: 'Areas of Responsibility', path: '/areasOfResponsibility', params: '?onlyData=true&limit=20', keywords: ['responsibility', 'representative', 'aor'] },
-  { name: 'Assignment Statuses', path: '/assignmentStatuses', params: '?onlyData=true&limit=20', keywords: ['assignment status', 'status type'] },
-  { name: 'Departments', path: '/departments', params: '?onlyData=true&limit=20', keywords: ['department', 'dept'] },
-  { name: 'Locations', path: '/locations', params: '?onlyData=true&limit=20', keywords: ['location', 'office', 'site', 'address'] },
-  { name: 'Jobs', path: '/jobs', params: '?onlyData=true&limit=20', keywords: ['job', 'role', 'position title'] },
-  { name: 'Positions', path: '/positions', params: '?onlyData=true&limit=20', keywords: ['position', 'posting'] },
-  { name: 'Grades', path: '/grades', params: '?onlyData=true&limit=20', keywords: ['grade', 'level', 'band'] },
-  { name: 'Time Cards', path: '/timeCards', params: '?onlyData=true&limit=20', keywords: ['time card', 'timesheet', 'hours', 'clock'] },
-  { name: 'Payroll Relationships', path: '/payrollRelationships', params: '?onlyData=true&limit=20', keywords: ['payroll', 'salary', 'pay', 'wage'] },
-  { name: 'Worker Locations', path: '/workerLocations', params: '?onlyData=true&limit=20', keywords: ['worker location', 'assignment location'] },
-  { name: 'Worker Phones', path: '/workerPhones', params: '?onlyData=true&limit=20', keywords: ['phone', 'telephone', 'mobile'] },
-  { name: 'Worker Emails', path: '/workerEmails', params: '?onlyData=true&limit=20', keywords: ['email', 'e-mail', 'mail'] },
-  { name: 'Worker Addresses', path: '/workerAddresses', params: '?onlyData=true&limit=20', keywords: ['address', 'home address', 'mailing'] },
+  { name: 'Person Notes', path: '/personNotes', params: '?onlyData=true&limit=20', keywords: ['note', 'person note', 'comment'] },
+  { name: 'HCM Contacts', path: '/hcmContacts', params: '?onlyData=true&limit=20', keywords: ['contact', 'emergency', 'next of kin'] },
+
+  // ── Absences ──
+  { name: 'Absences', path: '/absences', params: '?onlyData=true&limit=20', keywords: ['absence', 'leave', 'time off', 'vacation', 'sick', 'absence record', 'leave record', 'my absences', 'leave history'] },
+  { name: 'Absence Types', path: '/absenceTypesLOV', params: '?onlyData=true&limit=50', keywords: ['absence type', 'leave type', 'absence category', 'types of absence', 'types of leave'], isTypeList: true },
+  { name: 'Absence Plans', path: '/absencePlansLOV', params: '?onlyData=true&limit=50', keywords: ['absence plan', 'leave plan', 'entitlement'] },
+  { name: 'Absence Calendars', path: '/absenceCalendars', params: '?onlyData=true&limit=20', keywords: ['absence calendar', 'leave calendar', 'org calendar'] },
+  { name: 'Absence No Entitlements', path: '/absenceNoEntitlements', params: '?onlyData=true&limit=20', keywords: ['absence no entitlement', 'no entitlement'] },
+
+  // ── Payroll ──
+  { name: 'Payroll Relationships', path: '/payrollRelationships', params: '?onlyData=true&limit=20', keywords: ['payroll', 'salary', 'pay', 'wage', 'earnings'] },
+  { name: 'Element Entries', path: '/elementEntries', params: '?onlyData=true&limit=20', keywords: ['element entry', 'pay element', 'earning', 'deduction'] },
+  { name: 'Calculation Entries', path: '/calculationEntries', params: '?onlyData=true&limit=20', keywords: ['calculation', 'calc card', 'payroll calculation'] },
+  { name: 'Flow Instances', path: '/flowInstances', params: '?onlyData=true&limit=20', keywords: ['flow instance', 'payroll flow', 'payroll run'] },
+  { name: 'Flow Patterns', path: '/flowPatterns', params: '?onlyData=true&limit=20', keywords: ['flow pattern', 'payroll process'] },
+  { name: 'Pay Advances', path: '/payAdvances', params: '?onlyData=true&limit=20', keywords: ['pay advance', 'salary advance', 'advance request'] },
+  { name: 'Plan Balances', path: '/planBalances', params: '?onlyData=true&limit=20', keywords: ['plan balance', 'balance', 'pay balance'] },
+
+  // ── Benefits ──
+  { name: 'Benefit Enrollments', path: '/benefitEnrollments', params: '?onlyData=true&limit=20', keywords: ['benefit enrollment', 'benefit', 'enrollment'] },
+  { name: 'Benefit Groups', path: '/benefitGroups', params: '?onlyData=true&limit=20', keywords: ['benefit group', 'benefit plan group'] },
+  { name: 'Benefit Opportunities', path: '/benefitEnrollmentOpportunities', params: '?onlyData=true&limit=20', keywords: ['benefit opportunity', 'enrollment opportunity'] },
+  { name: 'Benefit Year Periods', path: '/benefitYearPeriods', params: '?onlyData=true&limit=20', keywords: ['benefit year', 'benefit period'] },
+  { name: 'Benefits Comparison', path: '/benefitPlansComparison', params: '?onlyData=true&limit=20', keywords: ['compare benefits', 'benefit comparison'] },
+
+  // ── Compensation ──
+  { name: 'Salaries', path: '/salaries', params: '?onlyData=true&limit=20', keywords: ['salary', 'compensation', 'pay rate', 'annual salary'] },
+  { name: 'Salary Basis', path: '/salaryBasisLov', params: '?onlyData=true&limit=20', keywords: ['salary basis', 'pay basis'] },
+  { name: 'Grade Rates', path: '/gradeRates', params: '?onlyData=true&limit=20', keywords: ['grade rate', 'pay grade', 'salary grade'] },
+  { name: 'Grades', path: '/grades', params: '?onlyData=true&limit=20', keywords: ['grade', 'level', 'band', 'job grade'] },
+  { name: 'Grade Ladders', path: '/gradeLadders', params: '?onlyData=true&limit=20', keywords: ['grade ladder', 'career ladder', 'progression'] },
+  { name: 'Compensation Percentiles', path: '/compensationPeerSalaryPercentiles', params: '?onlyData=true&limit=20', keywords: ['percentile', 'compa-ratio', 'market position'] },
+  { name: 'Stock Profiles', path: '/compensationStockProfiles', params: '?onlyData=true&limit=20', keywords: ['stock', 'equity', 'stock profile'] },
+
+  // ── Time & Labor ──
+  { name: 'Time Records', path: '/timeRecords', params: '?onlyData=true&limit=20', keywords: ['time record', 'time card', 'timesheet', 'hours worked'] },
+  { name: 'Time Record Groups', path: '/timeRecordGroups', params: '?onlyData=true&limit=20', keywords: ['time group', 'time entry group'] },
+  { name: 'Time Attributes', path: '/timeAttributes', params: '?onlyData=true&limit=20', keywords: ['time attribute', 'time entry'] },
+  { name: 'Web Clock Events', path: '/webClockEvents', params: '?onlyData=true&limit=20', keywords: ['clock', 'punch', 'web clock', 'clock in', 'clock out'] },
+  { name: 'Schedule Requests', path: '/scheduleRequests', params: '?onlyData=true&limit=20', keywords: ['schedule request', 'shift request', 'schedule change'] },
+  { name: 'Geofences', path: '/timeGeofences', params: '?onlyData=true&limit=20', keywords: ['geofence', 'location fence', 'geo boundary'] },
+  { name: 'Attendance Violations', path: '/attendanceViolations', params: '?onlyData=true&limit=20', keywords: ['attendance', 'violation', 'tardy', 'absence violation'] },
+
+  // ── Goals & Performance ──
+  { name: 'Performance Goals', path: '/performanceGoals', params: '?onlyData=true&limit=20', keywords: ['performance goal', 'goal', 'objective'] },
+  { name: 'Goal Plans', path: '/goalPlans', params: '?onlyData=true&limit=20', keywords: ['goal plan', 'goal template'] },
+  { name: 'Goal Plan Assignees', path: '/goalPlanAssignees', params: '?onlyData=true&limit=20', keywords: ['goal assignee', 'goal assignment'] },
+  { name: 'Goal Plan Weights', path: '/goalPlanGoalWeights', params: '?onlyData=true&limit=20', keywords: ['goal weight', 'goal priority'] },
+  { name: 'Goals Progress', path: '/goalsProgressDetails', params: '?onlyData=true&limit=20', keywords: ['goal progress', 'goal status', 'goal completion'] },
+  { name: 'Library Goals', path: '/libraryGoals', params: '?onlyData=true&limit=20', keywords: ['library goal', 'goal library', 'predefined goal'] },
+  { name: 'Explore Goals', path: '/exploreGoals', params: '?onlyData=true&limit=20', keywords: ['explore goal', 'search goal', 'find goal'] },
+  { name: 'Performance Evaluations', path: '/performanceEvaluations', params: '?onlyData=true&limit=20', keywords: ['performance review', 'evaluation', 'appraisal', 'review document'] },
+  { name: 'Performance Cycles', path: '/perfCycles', params: '?onlyData=true&limit=20', keywords: ['performance cycle', 'review cycle', 'appraisal cycle'] },
+
+  // ── Talent & Learning ──
+  { name: 'Talent Person Profiles', path: '/talentPersonProfiles', params: '?onlyData=true&limit=20', keywords: ['talent profile', 'person profile', 'competency', 'skill profile'] },
+  { name: 'Talent Ratings', path: '/talentRatings', params: '?onlyData=true&limit=20', keywords: ['talent rating', 'competency rating', 'proficiency'] },
+  { name: 'Talent Feedback', path: '/talentFeedbackSuggestions', params: '?onlyData=true&limit=20', keywords: ['feedback', 'talent feedback', 'peer feedback'] },
+  { name: 'Learner Records', path: '/learnerLearningRecords', params: '?onlyData=true&limit=20', keywords: ['learning record', 'course', 'training', 'learning assignment'] },
+  { name: 'Learning Events', path: '/learningEvents', params: '?onlyData=true&limit=20', keywords: ['learning event', 'training event', 'class'] },
+  { name: 'Learning Items', path: '/learningSelfPacedItems', params: '?onlyData=true&limit=20', keywords: ['learning item', 'self-paced', 'online course'] },
+  { name: 'Learning Audiences', path: '/learningItemAudiences', params: '?onlyData=true&limit=20', keywords: ['learning audience', 'training audience'] },
+  { name: 'Learning Assignment Profiles', path: '/learningAssignmentProfiles', params: '?onlyData=true&limit=20', keywords: ['learning assignment', 'training assignment'] },
+
+  // ── Journeys ──
+  { name: 'Journeys', path: '/journeys', params: '?onlyData=true&limit=20', keywords: ['journey', 'journey template', 'onboarding journey'] },
+  { name: 'Worker Journeys', path: '/workerJourneys', params: '?onlyData=true&limit=20', keywords: ['worker journey', 'my journey', 'assigned journey'] },
+  { name: 'Worker Journey Tasks', path: '/workerJourneyTasks', params: '?onlyData=true&limit=20', keywords: ['journey task', 'onboarding task', 'offboarding task'] },
+  { name: 'Journey Allocations', path: '/journeyAllocations', params: '?onlyData=true&limit=20', keywords: ['journey allocation', 'journey assignment'] },
+  { name: 'Journey Counts', path: '/journeyCounts', params: '?onlyData=true&limit=20', keywords: ['journey count', 'journey summary'] },
+
+  // ── Recruiting ──
+  { name: 'Job Requisitions', path: '/recruitingJobRequisitions', params: '?onlyData=true&limit=20', keywords: ['requisition', 'job req', 'open position', 'hiring'] },
+  { name: 'Job Applications', path: '/recruitingJobApplications', params: '?onlyData=true&limit=20', keywords: ['job application', 'applicant', 'application'] },
+  { name: 'Recruiting Candidates', path: '/recruitingCandidates', params: '?onlyData=true&limit=20', keywords: ['candidate', 'recruiting candidate'] },
+  { name: 'Job Offers', path: '/recruitingJobOffers', params: '?onlyData=true&limit=20', keywords: ['job offer', 'offer letter', 'offer'] },
+  { name: 'Posted Jobs', path: '/recruitingJobSitePostedJobs', params: '?onlyData=true&limit=20', keywords: ['posted job', 'job posting', 'career site'] },
+  { name: 'Opportunity Marketplace', path: '/recruitingOppMktOpportunities', params: '?onlyData=true&limit=20', keywords: ['opportunity', 'marketplace', 'internal gig'] },
+  { name: 'Gig Details', path: '/recruitingOppMktGigDetails', params: '?onlyData=true&limit=20', keywords: ['gig', 'gig detail', 'short-term assignment'] },
+  { name: 'Recruiting Events', path: '/recruitingCEEvents', params: '?onlyData=true&limit=20', keywords: ['recruiting event', 'hiring event', 'career fair'] },
+  { name: 'Recruiting Campaigns', path: '/recruitingCampaignDetails', params: '?onlyData=true&limit=20', keywords: ['recruiting campaign', 'hiring campaign'] },
+  { name: 'My Job Applications', path: '/recruitingMyJobApplications', params: '?onlyData=true&limit=20', keywords: ['my application', 'my job application', 'my job'] },
+  { name: 'Interview Schedules', path: '/recruitingCEInterviewScheduleDetails', params: '?onlyData=true&limit=20', keywords: ['interview', 'interview schedule', 'interview details'] },
+
+  // ── Documents & Communications ──
+  { name: 'Document Records', path: '/documentRecords', params: '?onlyData=true&limit=20', keywords: ['document', 'attachment', 'file', 'record'] },
+  { name: 'Communications', path: '/communicateUIMyCommunications', params: '?onlyData=true&limit=20', keywords: ['communication', 'message', 'announcement', 'notification'] },
+  { name: 'Campaigns', path: '/communicateUICampaignDetails', params: '?onlyData=true&limit=20', keywords: ['campaign', 'communication campaign'] },
+  { name: 'Questionnaires', path: '/questionnaires', params: '?onlyData=true&limit=20', keywords: ['questionnaire', 'survey', 'form'] },
+  { name: 'Questions', path: '/questions', params: '?onlyData=true&limit=20', keywords: ['question', 'survey question'] },
+  { name: 'Check-In Documents', path: '/checkInDocuments', params: '?onlyData=true&limit=20', keywords: ['check-in', 'checkin document', 'manager check-in'] },
+  { name: 'Allocated Checklists', path: '/allocatedChecklists', params: '?onlyData=true&limit=20', keywords: ['checklist', 'task list', 'onboarding checklist'] },
+
+  // ── Tasks & Transactions ──
+  { name: 'Tasks', path: '/tasks', params: '?onlyData=true&limit=20', keywords: ['task', 'workflow task', 'pending task', 'todo'] },
+  { name: 'BP Notifications', path: '/businessProcessNotifications', params: '?onlyData=true&limit=20', keywords: ['bp notification', 'approval notification', 'workflow notification'] },
+  { name: 'BP Transactions', path: '/businessProcessTransactionManagementAsWorkers', params: '?onlyData=true&limit=20', keywords: ['transaction', 'bp transaction', 'approval', 'pending approval'] },
+  { name: 'Status Change Requests', path: '/statusChangeRequests', params: '?onlyData=true&limit=20', keywords: ['status change', 'status request'] },
+
+  // ── Organizational Data LOVs ──
+  { name: 'Legal Employers', path: '/legalEmployersLov', params: '?onlyData=true&limit=20', keywords: ['legal employer', 'company', 'legal entity'] },
+  { name: 'Business Units', path: '/hcmBusinessUnitsLOV', params: '?onlyData=true&limit=20', keywords: ['business unit', 'bu'] },
+  { name: 'Countries', path: '/hcmCountriesLov', params: '?onlyData=true&limit=20', keywords: ['country', 'country list'] },
+  { name: 'Cost Centers', path: '/hcmCostCentersLOV', params: '?onlyData=true&limit=20', keywords: ['cost center', 'cost centre'] },
+  { name: 'Legislative Data Groups', path: '/legislativeDataGroupsLOV', params: '?onlyData=true&limit=20', keywords: ['legislative', 'ldg', 'payroll jurisdiction'] },
+  { name: 'Job Families', path: '/jobFamiliesLov', params: '?onlyData=true&limit=20', keywords: ['job family', 'job function'] },
+  { name: 'Actions', path: '/actionsLOV', params: '?onlyData=true&limit=20', keywords: ['action', 'hr action', 'change action'] },
+  { name: 'Action Reasons', path: '/actionReasonsLOV', params: '?onlyData=true&limit=20', keywords: ['action reason', 'reason for change'] },
+
+  // ── Misc & Config ──
+  { name: 'Assignment Statuses', path: '/assignmentStatuses', params: '?onlyData=true&limit=20', keywords: ['assignment status', 'status type', 'worker status'] },
+  { name: 'Internet Accounts', path: '/internetAccounts', params: '?onlyData=true&limit=20', keywords: ['internet account', 'social account', 'web account'] },
+  { name: 'User Accounts', path: '/userAccounts', params: '?onlyData=true&limit=20', keywords: ['user account', 'login', 'username'] },
+  { name: 'Email Migrations', path: '/emailAddrMigrations', params: '?onlyData=true&limit=20', keywords: ['email migration', 'email address change'] },
+  { name: 'Document Delivery', path: '/documentDeliveryPreferences', params: '?onlyData=true&limit=20', keywords: ['delivery preference', 'document delivery'] },
+  { name: 'Extract Templates', path: '/extractConfiguratorTemplates', params: '?onlyData=true&limit=20', keywords: ['extract', 'template', 'data extract'] },
+  { name: 'Workforce Schedules', path: '/workforceScheduleDefinitions', params: '?onlyData=true&limit=20', keywords: ['schedule', 'shift', 'work schedule', 'roster'] },
+  { name: 'Incident Kiosks', path: '/incidentKiosks', params: '?onlyData=true&limit=20', keywords: ['incident', 'safety incident', 'workplace incident'] },
+  { name: 'Career Interests', path: '/careerInterests', params: '?onlyData=true&limit=20', keywords: ['career interest', 'job interest', 'career preference'] },
+  { name: 'Mass Assignments', path: '/massAssignmentChangeDashboard', params: '?onlyData=true&limit=20', keywords: ['mass assignment', 'bulk change', 'mass change'] },
 ];
 
 async function runDiscovery() {
