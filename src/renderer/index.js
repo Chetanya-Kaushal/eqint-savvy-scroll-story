@@ -268,7 +268,9 @@ async function autoFetchData(userMessage) {
     // Direct lookup by PersonNumber
     try {
       const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&q=PersonNumber=\'' + encodeURIComponent(personNumber) + '\'&limit=5';
+      console.log('[Renderer] Resolving person:', personNumber, url);
       const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
+      console.log('[Renderer] Resolve result: ok=' + result.ok, 'status=' + result.status, 'items=' + (result.data?.items?.length || 0));
       if (result.ok && result.data?.items?.length > 0) {
         resolvedPersons = result.data.items.map(p => ({
           personNumber: p.PersonNumber,
@@ -325,7 +327,9 @@ async function fetchDataForPerson(person, endpoints) {
       if (person && ep.path !== '/absenceTypesLOV') {
         url += '&q=PersonNumber=\'' + encodeURIComponent(person.personNumber) + '\'';
       }
+      console.log('[Renderer] Fetching:', ep.name, url);
       const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
+      console.log('[Renderer] Result:', ep.name, 'ok=' + result.ok, 'status=' + result.status, 'items=' + (result.data?.items?.length || 0));
       if (!result.ok) {
         // Strict access control — show clear error, no fallback
         if (result.status === 401) {
