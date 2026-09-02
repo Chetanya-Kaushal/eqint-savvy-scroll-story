@@ -1,5 +1,5 @@
-const { describe, it, expect } = require('vitest');
-const { checkModelVersion } = require('../../src/renderer/model-check');
+import { describe, it, expect } from 'vitest';
+import { checkModelVersion } from '../../src/renderer/model-check.js';
 
 describe('checkModelVersion', () => {
   it('reports up to date when the recommended model is installed', () => {

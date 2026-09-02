@@ -1,5 +1,5 @@
-const { describe, it, expect, vi } = require('vitest');
-const { loadPolicyConfig } = require('../../src/main/policy-config');
+import { describe, it, expect, vi } from 'vitest';
+import { loadPolicyConfig } from '../../src/main/policy-config.js';
 
 describe('loadPolicyConfig', () => {
   it('reads and parses the IT-managed policy file when present on Windows', () => {

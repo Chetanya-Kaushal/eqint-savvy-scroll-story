@@ -1,5 +1,5 @@
-const { describe, it, expect, vi } = require('vitest');
-const { makeTelemetryClient } = require('../../src/main/telemetry-client');
+import { describe, it, expect, vi } from 'vitest';
+import { makeTelemetryClient } from '../../src/main/telemetry-client.js';
 
 describe('telemetry-client', () => {
   it('does not send when disabled', async () => {
