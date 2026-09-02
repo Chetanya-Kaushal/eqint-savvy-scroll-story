@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, screen, desktopCapturer, Tray, Menu, global
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
+const { autoUpdater } = require('electron-updater');
 const { makeSecureStorage } = require('./main/secure-storage');
 const secureStorage = makeSecureStorage(safeStorage);
 
@@ -249,6 +250,10 @@ app.whenReady().then(() => {
   globalShortcut.register('CommandOrControl+Shift+S', () => {
     if (overlayWindow.isVisible()) overlayWindow.hide();
     else overlayWindow.show();
+  });
+
+  autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+    console.error('Auto-update check failed:', err);
   });
 });
 

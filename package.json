@@ -16,6 +16,7 @@
   "license": "MIT",
   "dependencies": {
     "electron-store": "^8.1.0",
+    "electron-updater": "^6.3.9",
     "keytar": "^7.9.0",
     "openid-client": "^6.8.7"
   },
@@ -31,6 +32,10 @@
     "appId": "com.eqint.savvy-desktop",
     "productName": "EQInt Savvy",
     "afterSign": "scripts/notarize.js",
+    "publish": {
+      "provider": "generic",
+      "url": "https://releases.savvy.eqint.example/"
+    },
     "win": {
       "target": ["nsis", "portable"],
       "icon": "assets/icon.ico"
