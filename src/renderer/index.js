@@ -238,11 +238,13 @@ async function autoFetchData(userMessage) {
     }, endpoints);
   }
 
-  // Step 2: Detect Person Number (numeric) in query
+  // Step 2: Detect Person Number (alphanumeric like NM290, or pure numeric)
   let personNumber = null;
-  const pnMatch = msg.match(/person\s*(?:number|#|no\.?)\s*(\d+)/i) || msg.match(/\b(\d{4,})\b/);
+  const pnMatch = msg.match(/person\s*(?:number|#|no\.?)\s*([A-Za-z0-9]+)/i)
+    || msg.match(/\b([A-Z]{2,}\d{2,})\b/)
+    || msg.match(/\b(\d{4,})\b/);
   if (pnMatch) {
-    personNumber = pnMatch[1];
+    personNumber = pnMatch[1].toUpperCase();
   }
 
   // Step 3: Detect person name in query
@@ -265,7 +267,7 @@ async function autoFetchData(userMessage) {
   if (personNumber) {
     // Direct lookup by PersonNumber
     try {
-      const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&q=PersonNumber=' + personNumber + '&limit=5';
+      const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&q=PersonNumber=\'' + encodeURIComponent(personNumber) + '\'&limit=5';
       const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
       if (result.ok && result.data?.items?.length > 0) {
         resolvedPersons = result.data.items.map(p => ({
@@ -279,7 +281,7 @@ async function autoFetchData(userMessage) {
   } else if (personName) {
     // Search by name
     try {
-      const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&q=DisplayName LIKE \'%25' + encodeURIComponent(personName) + '%25\'&limit=10';
+      const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&q=DisplayName LIKE \'%25' + encodeURIComponent(personName) + '%25\'&sortBy=DisplayName:asc&limit=10';
       const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
       if (result.ok && result.data?.items?.length > 0) {
         resolvedPersons = result.data.items.map(p => ({
@@ -320,8 +322,8 @@ async function fetchDataForPerson(person, endpoints) {
   for (const ep of endpoints) {
     try {
       let url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
-      if (person && ep.path !== '/workers') {
-        url += '&q=PersonNumber=' + person.personNumber;
+      if (person && ep.path !== '/absenceTypesLOV') {
+        url += '&q=PersonNumber=\'' + encodeURIComponent(person.personNumber) + '\'';
       }
       const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
       if (!result.ok) {
@@ -437,11 +439,16 @@ function formatItemAsHTML(path, item, idx) {
     || item.AbsenceTypeName || item.absenceTypeName
     || item.EmployeeName || item.employeeName
     || item.ChecklistName || item.checklistName
+    || item.FullName || item.fullName
+    || item.PersonName || item.personName
     || ((item.FirstName || item.firstName || '') + ' ' + (item.LastName || item.lastName || '')).trim();
   if (name) return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name)}</b></span></div>`;
+  // Fallback: try to find any field that looks like an ID or label
   const keys = Object.keys(item).filter(k => !k.startsWith('_') && typeof item[k] !== 'object');
   if (keys.length === 0) return `<div class="data-row"><span class="data-idx">#${idx}</span></div>`;
-  return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(item[keys[0]])}</b></span></div>`;
+  // Prefer PersonNumber or any field with "name" or "number" in key
+  const labelKey = keys.find(k => /person.?number|name|id|code|title/i.test(k)) || keys[0];
+  return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(item[labelKey])}</b></span></div>`;
 }
 
 const HTML_FORMATTERS = {
