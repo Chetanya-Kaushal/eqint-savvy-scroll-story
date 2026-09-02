@@ -4,6 +4,7 @@ const fs = require('fs');
 const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
 const { makeSecureStorage } = require('./main/secure-storage');
+const { loadPolicyConfig } = require('./main/policy-config');
 const secureStorage = makeSecureStorage(safeStorage);
 
 const store = new Store({
@@ -242,6 +243,12 @@ app.whenReady().then(() => {
       },
     });
   });
+
+  const policy = loadPolicyConfig((p, enc) => fs.readFileSync(p, enc), process.platform);
+  if (policy) {
+    const settings = store.get('settings');
+    store.set('settings', { ...settings, ...policy });
+  }
 
   createOverlay();
   createTray();
