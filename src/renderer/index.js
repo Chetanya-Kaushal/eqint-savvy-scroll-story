@@ -319,6 +319,14 @@ async function fetchDataForPerson(person, endpoints) {
       }
       const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
       if (!result.ok) {
+        // Strict access control — show clear error, no fallback
+        if (result.status === 401) {
+          return { type: 'access-denied', text: 'Authentication failed. Please check your Oracle credentials in Settings.' };
+        }
+        if (result.status === 403) {
+          const who = person ? ' for ' + person.displayName : '';
+          return { type: 'access-denied', text: 'Access denied. You do not have permission to view ' + ep.name.toLowerCase() + who + '. Contact your Oracle administrator.' };
+        }
         throw new Error('HTTP ' + result.status + ' ' + (result.statusText || '') + (result.body ? ' — ' + result.body.slice(0, 200) : ''));
       }
       const items = result.data?.items || [];
@@ -333,16 +341,8 @@ async function fetchDataForPerson(person, endpoints) {
         results.push(`[ORACLE DATA — ${label}] No records found.`);
       }
     } catch (err) {
-      const cached = discoveryData[ep.path];
-      if (cached && cached.length > 0) {
-        results.push(`[ORACLE DATA — ${ep.name}] ${cached.length} cached records (live fetch failed: ${err.message}):`);
-        cached.slice(0, 10).forEach((item, i) => {
-          results.push(`  ${i + 1}. ${formatItem(ep.path, item)}`);
-        });
-        results.push(`__HTML__${ep.name}__${ep.path}__${cached.length}__${JSON.stringify(cached)}`);
-      } else {
-        results.push(`[ERROR — ${ep.name}] ${err.message}`);
-      }
+      // Don't fall back to cache for network errors — show the error
+      results.push(`[ERROR — ${ep.name}] ${err.message}`);
     }
   }
   return { type: 'data', text: '\n' + results.join('\n'), results };
@@ -599,6 +599,17 @@ CRITICAL RULES:
   // Handle error
   if (fetchedData.type === 'error') {
     addMessage(fetchedData.text, 'bot');
+    return;
+  }
+
+  // Handle access-denied
+  if (fetchedData.type === 'access-denied') {
+    const container = document.getElementById('messages');
+    const denyDiv = document.createElement('div');
+    denyDiv.className = 'msg bot';
+    denyDiv.innerHTML = `<div class="msg-avatar">EQ</div><div class="msg-text" style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;">${escapeHtml(fetchedData.text)}</div>`;
+    container.appendChild(denyDiv);
+    container.scrollTop = container.scrollHeight;
     return;
   }
 
