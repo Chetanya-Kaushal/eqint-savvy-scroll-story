@@ -64,6 +64,7 @@ model AuditLog {
   actor     String
   action    String
   scope     String
+  hash      String?
   createdAt DateTime @default(now())
 
   @@index([tenantId])

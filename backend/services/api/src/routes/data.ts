@@ -22,6 +22,18 @@ export function registerDataRoutes(server: FastifyInstance): void {
     return { ok: true };
   });
 
+  server.post('/data/erase', { preHandler: requireAuth }, async (request) => {
+    const session = (request as FastifyRequest & { session: SessionClaims }).session;
+    const userId = session.userId;
+
+    await prisma.conversationEntry.deleteMany({ where: { userId } });
+    await prisma.personDataCache.deleteMany({ where: { userId } });
+
+    await writeAuditLog({ tenantId: session.tenantId, actor: 'system', action: 'data_subject_erasure', scope: `user:${userId}` });
+
+    return { erased: true };
+  });
+
   server.get<{ Params: { category: string } }>('/reference-data/:category', { preHandler: requireAuth }, async (request) => {
     const session = (request as FastifyRequest & { session: SessionClaims }).session;
     return prisma.referenceRecord.findMany({ where: { tenantId: session.tenantId, category: request.params.category } });
