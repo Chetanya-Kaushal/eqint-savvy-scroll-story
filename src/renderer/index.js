@@ -348,6 +348,15 @@ async function fetchDataForPerson(person, endpoints) {
         items.slice(0, 10).forEach((item, i) => {
           results.push(`  ${i + 1}. ${formatItem(ep.path, item)}`);
         });
+        // Include full raw data for the LLM to answer specific questions
+        results.push(`[FULL DATA — ${label}]:`);
+        items.slice(0, 10).forEach((item, i) => {
+          const clean = {};
+          for (const [k, v] of Object.entries(item)) {
+            if (!k.startsWith('_') && typeof v !== 'object' && v !== null && v !== '') clean[k] = v;
+          }
+          results.push(`  ${i + 1}. ${JSON.stringify(clean)}`);
+        });
         results.push(`__HTML__${label}__${ep.path}__${items.length}__${JSON.stringify(items)}`);
       } else {
         results.push(`[ORACLE DATA — ${label}] No records found.`);
@@ -386,19 +395,23 @@ function getDiscoveryContext() {
 const FORMATTERS = {
   '/workers': (w) => {
     const name = w.DisplayName || ((w.FirstName || '') + ' ' + (w.LastName || '')).trim() || 'N/A';
-    return name;
+    const dept = w.DepartmentName || '';
+    const job = w.JobName || w.PositionName || '';
+    const loc = w.LocationName || '';
+    const status = w.EmploymentStatus || w.WorkerType || '';
+    return `Name: ${name}${dept ? ' | Dept: ' + dept : ''}${job ? ' | Job: ' + job : ''}${loc ? ' | Location: ' + loc : ''}${status ? ' | Status: ' + status : ''}`;
   },
-  '/absences': (a) => `${a.AbsenceType || a.AbsenceTypeName || 'N/A'} — ${a.StartDate || 'N/A'}`,
-  '/organizations': (d) => d.Name || d.OrganizationName || 'N/A',
-  '/locations': (l) => l.Name || 'N/A',
-  '/jobs': (j) => j.Name || 'N/A',
-  '/positions': (p) => p.Name || 'N/A',
-  '/grades': (g) => g.Name || 'N/A',
-  '/timeRecords': (t) => t.EmployeeName || t.WorkerName || 'N/A',
-  '/payrollRelationships': (p) => p.EmployeeName || p.PersonNumber || 'N/A',
-  '/allocatedChecklists': (c) => c.ChecklistName || 'N/A',
-  '/areasOfResponsibility': (r) => r.ResponsibilityType || r.PersonName || 'N/A',
-  '/assignmentStatuses': (s) => s.Name || 'N/A',
+  '/absences': (a) => `Type: ${a.AbsenceType || a.AbsenceTypeName || 'N/A'} | From: ${a.StartDate || 'N/A'} | To: ${a.EndDate || 'N/A'} | Days: ${a.AbsenceDays || a.Duration || 'N/A'} | Status: ${a.AbsenceStatus || a.ApprovalStatus || 'N/A'}`,
+  '/organizations': (d) => `Name: ${d.Name || d.OrganizationName || 'N/A'} | Manager: ${d.ManagerName || ''} | Location: ${d.LocationName || ''}`,
+  '/locations': (l) => `Name: ${l.Name || 'N/A'} | City: ${l.City || ''} | Country: ${l.Country || ''}`,
+  '/jobs': (j) => `Name: ${j.Name || 'N/A'} | Family: ${j.JobFamilyName || ''} | Level: ${j.JobLevel || ''}`,
+  '/positions': (p) => `Name: ${p.Name || 'N/A'} | Dept: ${p.DepartmentName || ''} | Job: ${p.JobName || ''}`,
+  '/grades': (g) => `Name: ${g.Name || 'N/A'} | Ladder: ${g.GradeLadderName || ''}`,
+  '/timeRecords': (t) => `Employee: ${t.EmployeeName || t.WorkerName || 'N/A'} | Hours: ${t.TotalRegHours || t.Hours || 'N/A'} | Status: ${t.StatusCode || t.Status || ''}`,
+  '/payrollRelationships': (p) => `Name: ${p.EmployeeName || 'N/A'} | Status: ${p.Status || ''}`,
+  '/allocatedChecklists': (c) => `Name: ${c.ChecklistName || 'N/A'} | Status: ${c.Status || ''} | Due: ${c.DueDate || ''}`,
+  '/areasOfResponsibility': (r) => `Type: ${r.ResponsibilityType || 'N/A'} | Person: ${r.PersonName || ''}`,
+  '/assignmentStatuses': (s) => `Name: ${s.Name || 'N/A'}`,
 };
 
 // ── Pretty formatters for chat display ──
@@ -570,7 +583,9 @@ CRITICAL RULES:
 6. When showing data, always indicate it comes from their Oracle system.
 7. Never include instructions about how to use APIs - just show the data.
 8. Be brief and direct. No extra words.
-9. Format responses with bullet points, numbered lists, or short paragraphs. No raw JSON.`;
+9. Format responses with bullet points, numbered lists, or short paragraphs. No raw JSON.
+10. ALWAYS show person names, never show raw IDs like PersonId or PersonNumber in your response.
+11. Use the full data provided to answer specific questions (department, job, location, etc.).`;
 
   let fullMsg = msg;
 
@@ -625,7 +640,7 @@ CRITICAL RULES:
           }
           const llmText = result.text.split('\n').filter(l => !l.startsWith('__HTML__')).join('\n');
           const botMsg = addMessage('', 'bot');
-          const sysPrompt2 = 'You are Savvy, an Oracle Fusion HCM assistant. Format data with bullet points. No raw JSON.';
+          const sysPrompt2 = 'You are Savvy, an Oracle Fusion HCM assistant. Use the full data provided to answer. Always show person names, never raw IDs. Be brief.';
           const reply = await callLLM([{ role: 'system', content: sysPrompt2 }, { role: 'user', content: llmText }], (chunk) => {
             botMsg.querySelector('.msg-text').innerHTML = formatMarkdown(fullText);
             document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
