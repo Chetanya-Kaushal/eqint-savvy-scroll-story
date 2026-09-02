@@ -38,6 +38,18 @@ async function loadInitialState() {
   } catch { conversationHistory = []; }
   const collapsed = await window.savvy.getUiState('isCollapsed');
   if (collapsed) isCollapsed = true;
+
+  try {
+    const tagsResponse = await fetch(settings.ollamaUrl + '/api/tags');
+    const { models } = await tagsResponse.json();
+    const { checkModelVersion } = require('./model-check');
+    const versionCheck = checkModelVersion(models, settings.ollamaModel);
+    if (!versionCheck.upToDate) {
+      addMessage(versionCheck.message, 'bot');
+    }
+  } catch (err) {
+    console.log('Model version check skipped (Ollama not reachable):', err.message);
+  }
 }
 
 // Load HCM REST APIs knowledge (uses preloaded hcmApis and loads modules)
