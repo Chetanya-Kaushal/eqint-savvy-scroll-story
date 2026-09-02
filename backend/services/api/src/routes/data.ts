@@ -27,9 +27,19 @@ export function registerDataRoutes(server: FastifyInstance): void {
     return prisma.referenceRecord.findMany({ where: { tenantId: session.tenantId, category: request.params.category } });
   });
 
+  const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
   server.all<{ Params: { '*': string } }>('/hcm-proxy/*', { preHandler: requireAuth }, async (request, reply) => {
     const session = (request as FastifyRequest & { session: SessionClaims }).session;
     const resourcePath = '/' + request.params['*'];
+
+    if (request.method === 'GET') {
+      const cached = await prisma.personDataCache.findUnique({ where: { userId_resourcePath: { userId: session.userId, resourcePath } } });
+      if (cached && cached.expiresAt > new Date()) {
+        return cached.data;
+      }
+    }
+
     const ssoIdToken = request.headers['x-sso-id-token'] as string | undefined;
     const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: session.tenantId } });
 
@@ -48,8 +58,18 @@ export function registerDataRoutes(server: FastifyInstance): void {
     }
 
     const oracleResponse = await fetch(`${tenant.oracleBaseUrl}/hcmRestApi/resources/11.13.18.05${resourcePath}`, { headers });
+    const responseData = await oracleResponse.json();
+
+    if (request.method === 'GET' && oracleResponse.ok) {
+      await prisma.personDataCache.upsert({
+        where: { userId_resourcePath: { userId: session.userId, resourcePath } },
+        create: { userId: session.userId, resourcePath, data: responseData, expiresAt: new Date(Date.now() + CACHE_TTL_MS) },
+        update: { data: responseData, expiresAt: new Date(Date.now() + CACHE_TTL_MS) },
+      });
+    }
+
     await writeAuditLog({ tenantId: session.tenantId, actor: session.userId, action: 'hcm_proxy_read', scope: `${mode}:${resourcePath}` });
     reply.code(oracleResponse.status);
-    return oracleResponse.json();
+    return responseData;
   });
 }

@@ -77,3 +77,14 @@ model ConversationEntry {
 
   @@index([userId])
 }
+
+model PersonDataCache {
+  id           String   @id @default(uuid())
+  userId       String
+  resourcePath String
+  data         Json
+  expiresAt    DateTime
+
+  @@unique([userId, resourcePath])
+  @@index([expiresAt])
+}

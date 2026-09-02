@@ -144,3 +144,48 @@ describe('/hcm-proxy/* (degraded fallback mode)', () => {
     expect(logs[0].scope).toBe('degraded_service_account:/absences');
   });
 });
+
+describe('/hcm-proxy/* caching', () => {
+  let tenantId: string;
+  let token: string;
+
+  beforeEach(async () => {
+    process.env.SESSION_JWT_SECRET = 'test-secret';
+    setKmsProvider(fakeKms());
+    await prisma.auditLog.deleteMany();
+    await prisma.conversationEntry.deleteMany();
+    await prisma.personDataCache.deleteMany();
+    await prisma.referenceRecord.deleteMany();
+    await prisma.user.deleteMany();
+    await prisma.tenant.deleteMany();
+    const kms = fakeKms();
+    const tenant = await prisma.tenant.create({
+      data: {
+        name: 'Acme', oracleBaseUrl: 'https://acme.example.com',
+        oracleServiceUser: 'svc', oracleServicePass: await encryptField(kms, 'svc-pass'),
+      },
+    });
+    tenantId = tenant.id;
+    const user = await prisma.user.create({ data: { tenantId, email: 'jane@acme.test', role: 'employee', ssoSubject: 'sub-1' } });
+    token = issueSessionToken({ id: user.id, tenantId, role: 'employee' });
+  });
+
+  afterAll(async () => { await prisma.$disconnect(); });
+
+  it('serves a second identical request from cache without calling Oracle again', async () => {
+    let oracleCallCount = 0;
+    global.fetch = vi.fn(async (url: string) => {
+      if (url === 'https://acme.example.com/hcmRestApi/resources/11.13.18.05/absences') {
+        oracleCallCount += 1;
+        return { ok: true, status: 200, json: async () => ({ items: [{ id: 1 }] }) } as Response;
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as unknown as typeof fetch;
+
+    const server = buildServer();
+    await server.inject({ method: 'GET', url: '/hcm-proxy/absences', headers: { authorization: `Bearer ${token}` } });
+    await server.inject({ method: 'GET', url: '/hcm-proxy/absences', headers: { authorization: `Bearer ${token}` } });
+
+    expect(oracleCallCount).toBe(1);
+  });
+});
