@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('savvy', {
   setOverlaySize: (size) => ipcRenderer.invoke('set-overlay-size', size),
   getOverlayPosition: () => ipcRenderer.invoke('get-overlay-position'),
   setOverlayPosition: (pos) => ipcRenderer.invoke('set-overlay-position', pos),
+  centerIfNeeded: (x, y) => ipcRenderer.invoke('center-if-needed', { x, y }),
+  centerWindow: () => ipcRenderer.invoke('center-window'),
   clearBubbleMode: () => ipcRenderer.invoke('clear-bubble-mode'),
   moveOverlayToCorner: () => ipcRenderer.invoke('move-overlay-to-corner'),
   loadKnowledgeBase: () => ipcRenderer.invoke('load-knowledge-base'),

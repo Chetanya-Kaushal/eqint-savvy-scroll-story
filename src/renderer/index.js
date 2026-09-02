@@ -895,8 +895,14 @@ async function expandFromBubble() {
   // Restore window size and position
   await window.savvy.setOverlaySize(restoreSize);
 
+  // Center if saved position is in corner or off-screen
   if (restorePos.x !== null && restorePos.y !== null) {
-    await window.savvy.setOverlayPosition(restorePos);
+    const centered = await window.savvy.centerIfNeeded(restorePos.x, restorePos.y);
+    if (!centered) {
+      await window.savvy.setOverlayPosition(restorePos);
+    }
+  } else {
+    await window.savvy.centerWindow();
   }
 }
 

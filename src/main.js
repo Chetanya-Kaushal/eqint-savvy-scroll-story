@@ -241,6 +241,36 @@ ipcMain.handle('set-overlay-position', (e, { x, y }) => {
   return false;
 });
 
+// Center window if position is in corner or off-screen
+ipcMain.handle('center-if-needed', (e, { x, y }) => {
+  if (!overlayWindow) return false;
+  const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
+  const [winW] = overlayWindow.getSize();
+  // If near right edge, bottom edge, or off-screen → center
+  if (x > screenW - 100 || y > screenH - 100 || x < -10 || y < -10) {
+    const centerX = Math.round((screenW - winW) / 2) + 60;
+    const centerY = Math.round((screenH - 750) / 2);
+    overlayWindow.setPosition(centerX, centerY);
+    store.set('overlayX', centerX);
+    store.set('overlayY', centerY);
+    return true; // was centered
+  }
+  return false; // position was fine
+});
+
+// Force center window
+ipcMain.handle('center-window', () => {
+  if (!overlayWindow) return false;
+  const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
+  const [winW] = overlayWindow.getSize();
+  const centerX = Math.round((screenW - winW) / 2) + 60;
+  const centerY = Math.round((screenH - 750) / 2);
+  overlayWindow.setPosition(centerX, centerY);
+  store.set('overlayX', centerX);
+  store.set('overlayY', centerY);
+  return true;
+});
+
 ipcMain.handle('clear-bubble-mode', () => {
   store.set('isBubbleMode', false);
   return true;
