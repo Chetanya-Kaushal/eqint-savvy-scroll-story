@@ -728,12 +728,14 @@ CRITICAL RULES:
 
   // Handle data
   let htmlSections = '';
+  let hasSinglePersonProfile = false;
   if (fetchedData && fetchedData.text) {
     const htmlLines = fetchedData.text.split('\n').filter(l => l.startsWith('__HTML__'));
     for (const line of htmlLines) {
       const parts = line.split('__');
       try {
         const items = JSON.parse(parts.slice(5).join('__'));
+        if (parts[3] === '/workers' && items.length === 1) hasSinglePersonProfile = true;
         htmlSections += renderDataBlock(parts[2], parts[3], items);
       } catch {}
     }
@@ -771,10 +773,18 @@ CRITICAL RULES:
     { role: 'user', content: fullMsg }
   ];
 
-  // Show the formatted data card first (if any) — but always continue on to ask the
-  // LLM to answer the user's specific question using the full data already folded
-  // into `fullMsg` above. Showing a name card is not the same as answering "what is
-  // their department" — the LLM call is what actually answers the question asked.
+  // Show the formatted data card first (if any) — then continue on to ask the LLM to
+  // answer the user's specific question using the full data already folded into
+  // `fullMsg` above. Showing a name card is not the same as answering "what is their
+  // department" — the LLM call is what actually answers the question asked.
+  //
+  // Exception: when exactly one Workers record resolved, the profile card above was
+  // built directly from whitelisted real fields and can never contain anything not
+  // actually in the system. Do NOT ask the LLM to add free-form prose on top of it —
+  // a small local model has been directly observed inventing a plausible-sounding
+  // name, department, and job title when the real record was too sparse to answer,
+  // which is exactly what showing data from the system, and only from the system,
+  // must never do. The card is the complete, trustworthy answer on its own.
   const container = document.getElementById('messages');
   if (htmlSections) {
     const dataDiv = document.createElement('div');
@@ -782,6 +792,15 @@ CRITICAL RULES:
     dataDiv.innerHTML = `<div class="msg-avatar">EQ</div><div class="msg-text">${htmlSections}</div>`;
     container.appendChild(dataDiv);
     container.scrollTop = container.scrollHeight;
+  }
+
+  if (hasSinglePersonProfile) {
+    const note = 'Only the details shown above are on file for this person in the system.';
+    addMessage(note, 'bot');
+    conversationHistory.push({ role: 'user', content: msg, timestamp: Date.now() });
+    conversationHistory.push({ role: 'bot', content: note, timestamp: Date.now() });
+    try { await window.savvy.saveConversationHistory(conversationHistory.slice(-100)); } catch {}
+    return;
   }
 
   const botMsg = addMessage('', 'bot');
