@@ -189,62 +189,116 @@ async function autoFetchData(userMessage) {
   const msg = userMessage.toLowerCase();
 
   if (!settings.oracleUrl || !settings.oracleUser || !settings.oraclePass) {
-    return '[ERROR] Oracle Fusion not configured. Set URL, username, and password in Settings.';
+    return { type: 'error', text: '[ERROR] Oracle Fusion not configured. Set URL, username, and password in Settings.' };
   }
 
   const endpoints = HCM_ENDPOINTS.filter(ep => ep.keywords.some(kw => msg.includes(kw)));
 
   if (endpoints.length === 0) {
     const ctx = getDiscoveryContext();
-    if (ctx) return ctx;
-    return '[INFO] No specific data matched. Try asking about employees, absences, departments, jobs, grades, time cards, checklists, etc.';
+    if (ctx) return { type: 'text', text: ctx };
+    return { type: 'text', text: '[INFO] No specific data matched. Try asking about employees, absences, departments, jobs, grades, time cards, checklists, etc.' };
   }
 
-  // Check if query mentions a specific person (e.g., "John Smith's absences")
-  let personFilter = null;
-  const personMatch = msg.match(/(?:for|of|belonging to|assigned to)\s+([a-z][a-z\s]+?)(?:'s|\s|$)/i)
-    || msg.match(/([a-z][a-z\s]+?)'s\s+(?:absence|leave|time|payroll|checklist|phone|email|address)/i);
-  if (personMatch) {
-    const nameGuess = personMatch[1].trim();
-    // Only resolve if it looks like a real name (2+ chars, not a keyword)
-    const isKeyword = HCM_ENDPOINTS.some(ep => ep.keywords.some(kw => nameGuess.includes(kw)));
-    if (nameGuess.length >= 2 && !isKeyword) {
-      try {
-        const workersUrl = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&q=DisplayName LIKE \'%25' + encodeURIComponent(nameGuess) + '%25\'&limit=5';
-        const result = await window.savvy.oracleApi(workersUrl, settings.oracleUser, settings.oraclePass);
-        if (result.ok && result.data?.items?.length > 0) {
-          const person = result.data.items[0];
-          personFilter = {
-            personId: person.PersonId || person.PersonNumber,
-            displayName: person.DisplayName || ((person.FirstName || '') + ' ' + (person.LastName || '')).trim(),
-          };
-        }
-      } catch {}
+  // Step 1: Detect Person Number (numeric) in query
+  let personNumber = null;
+  const pnMatch = msg.match(/person\s*(?:number|#|no\.?)\s*(\d+)/i) || msg.match(/\b(\d{4,})\b/);
+  if (pnMatch) {
+    personNumber = pnMatch[1];
+  }
+
+  // Step 2: Detect person name in query
+  let personName = null;
+  if (!personNumber) {
+    const nameMatch = msg.match(/(?:for|of|belonging to|assigned to)\s+([a-z][a-z\s]+?)(?:'s|\s|$)/i)
+      || msg.match(/([a-z][a-z\s]+?)'s\s+(?:absence|leave|time|payroll|checklist|phone|email|address|data|info)/i);
+    if (nameMatch) {
+      const guess = nameMatch[1].trim();
+      const isKeyword = HCM_ENDPOINTS.some(ep => ep.keywords.some(kw => guess.includes(kw)));
+      if (guess.length >= 2 && !isKeyword) {
+        personName = guess;
+      }
     }
   }
 
+  // Step 3: Resolve person — either by number or by name search
+  let resolvedPersons = [];
+
+  if (personNumber) {
+    // Direct lookup by PersonNumber
+    try {
+      const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&q=PersonNumber=' + personNumber + '&limit=5';
+      const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
+      if (result.ok && result.data?.items?.length > 0) {
+        resolvedPersons = result.data.items.map(p => ({
+          personNumber: p.PersonNumber,
+          displayName: p.DisplayName || ((p.FirstName || '') + ' ' + (p.LastName || '')).trim(),
+          department: p.DepartmentName || '',
+          job: p.JobName || '',
+        }));
+      }
+    } catch {}
+  } else if (personName) {
+    // Search by name
+    try {
+      const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&q=DisplayName LIKE \'%25' + encodeURIComponent(personName) + '%25\'&limit=10';
+      const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
+      if (result.ok && result.data?.items?.length > 0) {
+        resolvedPersons = result.data.items.map(p => ({
+          personNumber: p.PersonNumber,
+          displayName: p.DisplayName || ((p.FirstName || '') + ' ' + (p.LastName || '')).trim(),
+          department: p.DepartmentName || '',
+          job: p.JobName || '',
+        }));
+      }
+    } catch {}
+  }
+
+  // Step 4: Handle resolution results
+  if (personNumber || personName) {
+    if (resolvedPersons.length === 0) {
+      return { type: 'no-data', text: 'No employee found matching "' + (personNumber || personName) + '". Please check the name or person number and try again.' };
+    }
+    if (resolvedPersons.length > 1) {
+      // Multiple matches — ask user to choose
+      return {
+        type: 'choose-person',
+        text: 'Found ' + resolvedPersons.length + ' matching employees. Please select one:',
+        persons: resolvedPersons,
+        endpoints: endpoints,
+      };
+    }
+    // Exactly one match — proceed with that person
+    const person = resolvedPersons[0];
+    return await fetchDataForPerson(person, endpoints);
+  }
+
+  // No person mentioned — fetch general data
+  return await fetchDataForPerson(null, endpoints);
+}
+
+async function fetchDataForPerson(person, endpoints) {
   const results = [];
   for (const ep of endpoints) {
     try {
       let url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
-      // If person resolved and endpoint supports PersonId filter, apply it
-      if (personFilter && personFilter.personId && ep.path !== '/workers') {
-        url += '&q=PersonId=' + personFilter.personId;
+      if (person && ep.path !== '/workers') {
+        url += '&q=PersonNumber=' + person.personNumber;
       }
       const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
       if (!result.ok) {
         throw new Error('HTTP ' + result.status + ' ' + (result.statusText || '') + (result.body ? ' — ' + result.body.slice(0, 200) : ''));
       }
       const items = result.data?.items || [];
+      const label = person ? ep.name + ' for ' + person.displayName : ep.name;
       if (items.length > 0) {
-        const label = personFilter ? `${ep.name} for ${personFilter.displayName}` : ep.name;
         results.push(`[ORACLE DATA — ${label}] ${items.length} records found:`);
         items.slice(0, 10).forEach((item, i) => {
           results.push(`  ${i + 1}. ${formatItem(ep.path, item)}`);
         });
         results.push(`__HTML__${label}__${ep.path}__${items.length}__${JSON.stringify(items)}`);
       } else {
-        results.push(`[ORACLE DATA — ${ep.name}] No records found.`);
+        results.push(`[ORACLE DATA — ${label}] No records found.`);
       }
     } catch (err) {
       const cached = discoveryData[ep.path];
@@ -259,7 +313,7 @@ async function autoFetchData(userMessage) {
       }
     }
   }
-  return '\n' + results.join('\n');
+  return { type: 'data', text: '\n' + results.join('\n'), results };
 }
 
 function formatItem(path, item) {
@@ -425,23 +479,89 @@ CRITICAL RULES:
 
   // Auto-fetch real data from Oracle HCM based on user intent
   const fetchedData = await autoFetchData(msg);
+
+  // Handle choose-person: show selection buttons
+  if (fetchedData.type === 'choose-person') {
+    const container = document.getElementById('messages');
+    const chooseDiv = document.createElement('div');
+    chooseDiv.className = 'msg bot';
+    let buttonsHtml = fetchedData.persons.map((p, i) =>
+      `<button class="person-select-btn" data-pn="${escapeHtml(p.personNumber)}" data-name="${escapeHtml(p.displayName)}" data-eps="${escapeHtml(JSON.stringify(fetchedData.endpoints.map(e => e.path)))}" style="display:block;width:100%;text-align:left;padding:8px 12px;margin:4px 0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:12px;border-left:3px solid #0070F3;">
+        <b>${escapeHtml(p.displayName)}</b> &middot; #${escapeHtml(p.personNumber)}${p.department ? ' &middot; ' + escapeHtml(p.department) : ''}
+      </button>`
+    ).join('');
+    chooseDiv.innerHTML = `<div class="msg-avatar">EQ</div><div class="msg-text"><div style="margin-bottom:6px;">${escapeHtml(fetchedData.text)}</div>${buttonsHtml}</div>`;
+    container.appendChild(chooseDiv);
+    container.scrollTop = container.scrollHeight;
+
+    // Attach click handlers
+    chooseDiv.querySelectorAll('.person-select-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const pn = btn.dataset.pn;
+        const name = btn.dataset.name;
+        const eps = JSON.parse(btn.dataset.eps);
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        const epDefs = eps.map(p => HCM_ENDPOINTS.find(e => e.path === p)).filter(Boolean);
+        const person = { personNumber: pn, displayName: name };
+        const result = await fetchDataForPerson(person, epDefs);
+        if (result.type === 'data' && result.text) {
+          // Show the data
+          const htmlLines = result.text.split('\n').filter(l => l.startsWith('__HTML__'));
+          let html = '';
+          for (const line of htmlLines) {
+            const parts = line.split('__');
+            try {
+              const items = JSON.parse(parts.slice(5).join('__'));
+              html += buildFormattedList(parts[2], parts[3], items);
+            } catch {}
+          }
+          if (html) {
+            const dataDiv = document.createElement('div');
+            dataDiv.className = 'msg bot';
+            dataDiv.innerHTML = `<div class="msg-avatar">EQ</div><div class="msg-text">${html}</div>`;
+            container.appendChild(dataDiv);
+          }
+          const llmText = result.text.split('\n').filter(l => !l.startsWith('__HTML__')).join('\n');
+          const botMsg = addMessage('', 'bot');
+          const sysPrompt2 = 'You are Savvy, an Oracle Fusion HCM assistant. Format data with bullet points. No raw JSON.';
+          const reply = await callLLM([{ role: 'system', content: sysPrompt2 }, { role: 'user', content: llmText }], (chunk) => {
+            botMsg.querySelector('.msg-text').innerHTML = formatMarkdown(fullText);
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+          });
+        } else if (result.type === 'no-data') {
+          addMessage(result.text, 'bot');
+        }
+        container.scrollTop = container.scrollHeight;
+      });
+    });
+    return;
+  }
+
+  // Handle no-data
+  if (fetchedData.type === 'no-data') {
+    addMessage(fetchedData.text, 'bot');
+    return;
+  }
+
+  // Handle error
+  if (fetchedData.type === 'error') {
+    addMessage(fetchedData.text, 'bot');
+    return;
+  }
+
+  // Handle data
   let htmlSections = '';
-  if (fetchedData) {
-    // Extract HTML sections from fetchedData
-    const htmlLines = fetchedData.split('\n').filter(l => l.startsWith('__HTML__'));
+  if (fetchedData && fetchedData.text) {
+    const htmlLines = fetchedData.text.split('\n').filter(l => l.startsWith('__HTML__'));
     for (const line of htmlLines) {
       const parts = line.split('__');
-      // __HTML__Name__path__count__json
-      const epName = parts[2];
-      const epPath = parts[3];
-      const count = parseInt(parts[4]);
       try {
         const items = JSON.parse(parts.slice(5).join('__'));
-        htmlSections += buildFormattedList(epName, epPath, items);
+        htmlSections += buildFormattedList(parts[2], parts[3], items);
       } catch {}
     }
-    // Strip HTML markers from LLM context
-    const llmData = fetchedData.split('\n').filter(l => !l.startsWith('__HTML__')).join('\n');
+    const llmData = fetchedData.text.split('\n').filter(l => !l.startsWith('__HTML__')).join('\n');
     fullMsg = llmData + '\n\n' + fullMsg;
   }
 
