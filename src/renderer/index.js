@@ -1,4 +1,5 @@
 const { HCMDiscovery } = require('./hcm-discovery');
+const { classifyOracleError } = require('./access-control');
 
 let settings = {
   ollamaUrl: 'http://localhost:11434',
@@ -42,7 +43,7 @@ async function loadInitialState() {
   hcmApis = kb.hcmApis;
   knowledgeBase = kb.knowledgeBase;
   try {
-    conversationHistory = JSON.parse(await window.savvy.invoke('get-conversation-history') || '[]');
+    conversationHistory = await window.savvy.getConversationHistory() || [];
   } catch { conversationHistory = []; }
   const collapsed = await window.savvy.getUiState('isCollapsed');
   if (collapsed) isCollapsed = true;
@@ -319,27 +320,32 @@ async function autoFetchData(userMessage) {
   return await fetchDataForPerson(null, endpoints);
 }
 
+const { isPersonScoped } = require('./endpoint-scoping');
+
 async function fetchDataForPerson(person, endpoints) {
   const results = [];
-  for (const ep of endpoints) {
+  const scopedEndpoints = person ? endpoints.filter((ep) => isPersonScoped(ep.path)) : endpoints;
+  for (const ep of scopedEndpoints) {
     try {
       let url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
-      if (person && ep.path !== '/absenceTypesLOV') {
+      if (person) {
         url += '&q=PersonNumber=\'' + encodeURIComponent(person.personNumber) + '\'';
       }
       console.log('[Renderer] Fetching:', ep.name, url);
       const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
       console.log('[Renderer] Result:', ep.name, 'ok=' + result.ok, 'status=' + result.status, 'items=' + (result.data?.items?.length || 0));
       if (!result.ok) {
-        // Strict access control — show clear error, no fallback
-        if (result.status === 401) {
+        if (classifyOracleError(result.status) === 'hard-stop') {
           return { type: 'access-denied', text: 'Authentication failed. Please check your Oracle credentials in Settings.' };
         }
-        if (result.status === 403) {
-          const who = person ? ' for ' + person.displayName : '';
-          return { type: 'access-denied', text: 'Access denied. You do not have permission to view ' + ep.name.toLowerCase() + who + '. Contact your Oracle administrator.' };
-        }
-        throw new Error('HTTP ' + result.status + ' ' + (result.statusText || '') + (result.body ? ' — ' + result.body.slice(0, 200) : ''));
+        // soft-skip: record and move on to the next endpoint rather than discarding
+        // everything already fetched in this batch.
+        const who = person ? ' for ' + person.displayName : '';
+        const reason = result.status === 403
+          ? 'You do not have permission to view ' + ep.name.toLowerCase() + who + '.'
+          : 'HTTP ' + result.status + ' ' + (result.statusText || '');
+        results.push(`[NO ACCESS — ${ep.name}] ${reason}`);
+        continue;
       }
       const items = result.data?.items || [];
       const label = person ? ep.name + ' for ' + person.displayName : ep.name;
@@ -450,22 +456,11 @@ function formatDate(d) {
   } catch { return escapeHtml(String(d)); }
 }
 
+const { pickDisplayLabel } = require('./name-resolver');
+
 function formatItemAsHTML(path, item, idx) {
-  const name = item.DisplayName || item.displayName
-    || item.Name || item.name
-    || item.AbsenceTypeName || item.absenceTypeName
-    || item.EmployeeName || item.employeeName
-    || item.ChecklistName || item.checklistName
-    || item.FullName || item.fullName
-    || item.PersonName || item.personName
-    || ((item.FirstName || item.firstName || '') + ' ' + (item.LastName || item.lastName || '')).trim();
-  if (name) return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name)}</b></span></div>`;
-  // Fallback: try to find any field that looks like an ID or label
-  const keys = Object.keys(item).filter(k => !k.startsWith('_') && typeof item[k] !== 'object');
-  if (keys.length === 0) return `<div class="data-row"><span class="data-idx">#${idx}</span></div>`;
-  // Prefer PersonNumber or any field with "name" or "number" in key
-  const labelKey = keys.find(k => /person.?number|name|id|code|title/i.test(k)) || keys[0];
-  return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(item[labelKey])}</b></span></div>`;
+  const label = pickDisplayLabel(item) || '—';
+  return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(label)}</b></span></div>`;
 }
 
 const HTML_FORMATTERS = {
@@ -474,11 +469,7 @@ const HTML_FORMATTERS = {
     return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name || '—')}</b></span></div>`;
   },
   '/workers': (w, idx) => {
-    const name = w.DisplayName || w.displayName || ((w.FirstName || w.firstName || '') + ' ' + (w.LastName || w.lastName || '')).trim();
-    if (!name || name === ' ') {
-      const keys = Object.keys(w).filter(k => !k.startsWith('_') && typeof w[k] !== 'object').slice(0, 1);
-      return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(keys.length ? w[keys[0]] : '?')}</b></span></div>`;
-    }
+    const name = pickDisplayLabel(w) || '?';
     return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(name)}</b></span></div>`;
   },
   '/absences': (a, idx) => {
@@ -642,10 +633,15 @@ CRITICAL RULES:
           const botMsg = addMessage('', 'bot');
           const sysPrompt2 = 'You are Savvy, an Oracle Fusion HCM assistant. Use the full data provided to answer. Always show person names, never raw IDs. Be brief.';
           const recentHist2 = conversationHistory.slice(-10).map(h => ({ role: h.role === 'bot' ? 'assistant' : 'user', content: h.content }));
+          let selectionText = '';
           const reply = await callLLM([{ role: 'system', content: sysPrompt2 }, ...recentHist2, { role: 'user', content: llmText }], (chunk) => {
-            botMsg.querySelector('.msg-text').innerHTML = formatMarkdown(fullText);
+            selectionText += chunk;
+            botMsg.querySelector('.msg-text').innerHTML = formatMarkdown(selectionText);
             document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
           });
+          conversationHistory.push({ role: 'user', content: `Selected: ${name} (#${pn})`, timestamp: Date.now() });
+          conversationHistory.push({ role: 'bot', content: selectionText || reply, timestamp: Date.now() });
+          try { await window.savvy.saveConversationHistory(conversationHistory.slice(-100)); } catch {}
         } else if (result.type === 'no-data') {
           addMessage(result.text, 'bot');
         }
@@ -723,7 +719,10 @@ CRITICAL RULES:
     { role: 'user', content: fullMsg }
   ];
 
-  // Show HTML data sections first if available
+  // Show the formatted data card first (if any) — but always continue on to ask the
+  // LLM to answer the user's specific question using the full data already folded
+  // into `fullMsg` above. Showing a name card is not the same as answering "what is
+  // their department" — the LLM call is what actually answers the question asked.
   const container = document.getElementById('messages');
   if (htmlSections) {
     const dataDiv = document.createElement('div');
@@ -731,11 +730,6 @@ CRITICAL RULES:
     dataDiv.innerHTML = `<div class="msg-avatar">EQ</div><div class="msg-text">${htmlSections}</div>`;
     container.appendChild(dataDiv);
     container.scrollTop = container.scrollHeight;
-    // Data already shown — skip LLM call
-    conversationHistory.push({ role: 'user', content: msg, timestamp: Date.now() });
-    conversationHistory.push({ role: 'bot', content: '[Data displayed in formatted list]', timestamp: Date.now() });
-    try { await window.savvy.invoke('set-conversation-history', JSON.stringify(conversationHistory.slice(-100))); } catch {}
-    return;
   }
 
   const botMsg = addMessage('', 'bot');
@@ -750,7 +744,7 @@ CRITICAL RULES:
   // Save to conversation history
   conversationHistory.push({ role: 'user', content: msg, timestamp: Date.now() });
   conversationHistory.push({ role: 'bot', content: fullText || reply, timestamp: Date.now() });
-  try { await window.savvy.invoke('set-conversation-history', JSON.stringify(conversationHistory.slice(-100))); } catch {}
+  try { await window.savvy.saveConversationHistory(conversationHistory.slice(-100)); } catch {}
 }
 
 // ── Understand (HCM Discovery) ──

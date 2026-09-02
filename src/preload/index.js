@@ -21,4 +21,6 @@ contextBridge.exposeInMainWorld('savvy', {
   logout: () => ipcRenderer.invoke('logout'),
   getUiState: (key) => ipcRenderer.invoke('get-ui-state', key),
   setUiState: (key, value) => ipcRenderer.invoke('set-ui-state', key, value),
+  getConversationHistory: () => ipcRenderer.invoke('get-conversation-history'),
+  saveConversationHistory: (history) => ipcRenderer.invoke('set-conversation-history', history),
 });

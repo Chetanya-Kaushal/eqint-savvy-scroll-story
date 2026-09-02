@@ -128,6 +128,14 @@ ipcMain.handle('set-settings', (e, newSettings) => {
 });
 
 // Oracle HCM REST API proxy — bypasses CORS by making requests from main process
+ipcMain.handle('get-conversation-history', () => {
+  return store.get('conversationHistory', []);
+});
+ipcMain.handle('set-conversation-history', (e, history) => {
+  store.set('conversationHistory', history);
+  return true;
+});
+
 ipcMain.handle('oracle-api', async (e, { url, user, pass }) => {
   console.log('[Oracle] API call:', url);
   return new Promise((resolve, reject) => {
