@@ -17,8 +17,9 @@ const store = new Store({
     settings: {
       ollamaUrl: 'http://localhost:11434',
       ollamaModel: 'phi3:mini',
-      backendUrl: '',
-      tenantId: '',
+      oracleUrl: '',
+      oracleUser: '',
+      oraclePass: '',
       alwaysOnTop: true,
     },
     overlayX: null,

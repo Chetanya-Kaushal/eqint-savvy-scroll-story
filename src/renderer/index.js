@@ -1,15 +1,14 @@
 const { HCMDiscovery } = require('./hcm-discovery');
-const { makeBackendClient } = require('./backend-client');
 
 let settings = {
   ollamaUrl: 'http://localhost:11434',
   ollamaModel: 'phi3:mini',
-  backendUrl: '',
-  tenantId: '',
+  oracleUrl: '',
+  oracleUser: '',
+  oraclePass: '',
   alwaysOnTop: true,
 };
 
-let backendClient = null;
 let hcmDiscovery = null;
 let hcmData = null;
 let hcmApis = null;
@@ -18,13 +17,15 @@ let conversationHistory = [];
 let hcmModules = {};
 let isCollapsed = false;
 
-async function initBackendClient() {
-  const authState = await window.savvy.getAuthState();
-  backendClient = makeBackendClient({
-    backendUrl: settings.backendUrl,
-    getAuthState: () => window.savvy.getAuthState(),
-  });
-  return authState;
+async function oracleFetch(resourcePath) {
+  if (!settings.oracleUrl || !settings.oracleUser || !settings.oraclePass) {
+    return null;
+  }
+  const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + resourcePath;
+  const auth = 'Basic ' + btoa(settings.oracleUser + ':' + settings.oraclePass);
+  const resp = await fetch(url, { headers: { Authorization: auth, Accept: 'application/json' } });
+  if (!resp.ok) return null;
+  return resp.json();
 }
 
 async function loadInitialState() {
@@ -32,9 +33,8 @@ async function loadInitialState() {
   const kb = await window.savvy.loadKnowledgeBase();
   hcmApis = kb.hcmApis;
   knowledgeBase = kb.knowledgeBase;
-  if (settings.backendUrl) await initBackendClient();
   try {
-    conversationHistory = await backendClient?.getConversationHistory() || [];
+    conversationHistory = JSON.parse(await window.savvy.invoke('get-conversation-history') || '[]');
   } catch { conversationHistory = []; }
   const collapsed = await window.savvy.getUiState('isCollapsed');
   if (collapsed) isCollapsed = true;
@@ -183,8 +183,8 @@ async function detectVisionModel() {
 async function autoFetchData(userMessage) {
   const msg = userMessage.toLowerCase();
 
-  if (!backendClient) {
-    return '\n[ERROR] Not signed in. Please sign in with SSO in the Settings tab.';
+  if (!settings.oracleUrl || !settings.oracleUser) {
+    return '\n[ERROR] Oracle Fusion not configured. Please enter your URL, username, and password in Settings.';
   }
 
   const oracleKeywords = ['absence', 'leave', 'employee', 'worker', 'team', 'department', 'location', 'job', 'position', 'payroll', 'salary', 'pay', 'benefit', 'insurance', 'time card', 'timesheet', 'hours', 'clock', 'performance', 'review', 'goal', 'learning', 'course', 'training', 'checklist', 'task', 'hcm', 'oracle', 'grade', 'headcount', 'head count', 'hire', 'termination', 'transfer'];
@@ -202,7 +202,7 @@ async function autoFetchData(userMessage) {
 
   try {
     if (msg.includes('absence') || msg.includes('leave') || msg.includes('time off') || msg.includes('vacation') || msg.includes('sick')) {
-      const data = await backendClient.fetchPersonData('/absences?onlyData=true&limit=20');
+      const data = await oracleFetch('/absences?onlyData=true&limit=20');
       if (data.items && data.items.length > 0) {
         const lines = data.items.map((a, i) => `${i+1}. ${formatAbsence(a)}`);
         return '\n[ORACLE DATA - ABSENCES]\n' + lines.join('\n');
@@ -211,7 +211,7 @@ async function autoFetchData(userMessage) {
     }
 
     if (msg.includes('employee') || msg.includes('worker') || msg.includes('team') || msg.includes('person') || msg.includes('list') || msg.includes('number') || msg.includes('headcount') || msg.includes('hire')) {
-      const data = await backendClient.fetchPersonData('/workers?onlyData=true&limit=20');
+      const data = await oracleFetch('/workers?onlyData=true&limit=20');
       if (data.items && data.items.length > 0) {
         const lines = data.items.map((w, i) => `${i+1}. ${formatWorker(w)}`);
         return '\n[ORACLE DATA - EMPLOYEES]\n' + lines.join('\n');
@@ -220,7 +220,7 @@ async function autoFetchData(userMessage) {
     }
 
     if (msg.includes('department') || msg.includes('dept')) {
-      const data = await backendClient.fetchPersonData('/departments?onlyData=true&limit=20');
+      const data = await oracleFetch('/departments?onlyData=true&limit=20');
       if (data.items && data.items.length > 0) {
         const lines = data.items.map((d, i) => `${i+1}. ${formatDepartment(d)}`);
         return '\n[ORACLE DATA - DEPARTMENTS]\n' + lines.join('\n');
@@ -229,7 +229,7 @@ async function autoFetchData(userMessage) {
     }
 
     if (msg.includes('location') || msg.includes('office') || msg.includes('site')) {
-      const data = await backendClient.fetchPersonData('/locations?onlyData=true&limit=20');
+      const data = await oracleFetch('/locations?onlyData=true&limit=20');
       if (data.items && data.items.length > 0) {
         const lines = data.items.map((l, i) => `${i+1}. ${formatLocation(l)}`);
         return '\n[ORACLE DATA - LOCATIONS]\n' + lines.join('\n');
@@ -238,7 +238,7 @@ async function autoFetchData(userMessage) {
     }
 
     if (msg.includes('job') || msg.includes('role')) {
-      const data = await backendClient.fetchPersonData('/jobs?onlyData=true&limit=20');
+      const data = await oracleFetch('/jobs?onlyData=true&limit=20');
       if (data.items && data.items.length > 0) {
         const lines = data.items.map((j, i) => `${i+1}. ${formatJob(j)}`);
         return '\n[ORACLE DATA - JOBS]\n' + lines.join('\n');
@@ -247,7 +247,7 @@ async function autoFetchData(userMessage) {
     }
 
     if (msg.includes('position')) {
-      const data = await backendClient.fetchPersonData('/positions?onlyData=true&limit=20');
+      const data = await oracleFetch('/positions?onlyData=true&limit=20');
       if (data.items && data.items.length > 0) {
         const lines = data.items.map((p, i) => `${i+1}. ${formatPosition(p)}`);
         return '\n[ORACLE DATA - POSITIONS]\n' + lines.join('\n');
@@ -256,7 +256,7 @@ async function autoFetchData(userMessage) {
     }
 
     if (msg.includes('grade') || msg.includes('salary band') || msg.includes('compensation')) {
-      const data = await backendClient.fetchPersonData('/grades?onlyData=true&limit=20');
+      const data = await oracleFetch('/grades?onlyData=true&limit=20');
       if (data.items && data.items.length > 0) {
         const lines = data.items.map((g, i) => `${i+1}. ${formatGrade(g)}`);
         return '\n[ORACLE DATA - GRADES]\n' + lines.join('\n');
@@ -265,7 +265,7 @@ async function autoFetchData(userMessage) {
     }
 
     if (msg.includes('time card') || msg.includes('timesheet') || msg.includes('hours worked') || msg.includes('clock') || msg.includes('attendance')) {
-      const data = await backendClient.fetchPersonData('/timeCards?onlyData=true&limit=20');
+      const data = await oracleFetch('/timeCards?onlyData=true&limit=20');
       if (data.items && data.items.length > 0) {
         const lines = data.items.map((t, i) => `${i+1}. ${formatTimeCard(t)}`);
         return '\n[ORACLE DATA - TIME CARDS]\n' + lines.join('\n');
@@ -274,7 +274,7 @@ async function autoFetchData(userMessage) {
     }
 
     if (msg.includes('payroll') || msg.includes('pay') || msg.includes('salary') || msg.includes('earning') || msg.includes('deduction')) {
-      const data = await backendClient.fetchPersonData('/payrollElements?onlyData=true&limit=20');
+      const data = await oracleFetch('/payrollElements?onlyData=true&limit=20');
       if (data.items && data.items.length > 0) {
         const lines = data.items.map((p, i) => `${i+1}. ${formatPayroll(p)}`);
         return '\n[ORACLE DATA - PAYROLL]\n' + lines.join('\n');
@@ -283,7 +283,7 @@ async function autoFetchData(userMessage) {
     }
 
     if (msg.includes('benefit') || msg.includes('insurance') || msg.includes('401k') || msg.includes('enrollment')) {
-      const data = await backendClient.fetchPersonData('/benefitEnrollments?onlyData=true&limit=20');
+      const data = await oracleFetch('/benefitEnrollments?onlyData=true&limit=20');
       if (data.items && data.items.length > 0) {
         const lines = data.items.map((b, i) => `${i+1}. ${formatBenefit(b)}`);
         return '\n[ORACLE DATA - BENEFITS]\n' + lines.join('\n');
@@ -292,7 +292,7 @@ async function autoFetchData(userMessage) {
     }
 
     if (msg.includes('performance') || msg.includes('review') || msg.includes('evaluation')) {
-      const data = await backendClient.fetchPersonData('/performanceReviews?onlyData=true&limit=20');
+      const data = await oracleFetch('/performanceReviews?onlyData=true&limit=20');
       if (data.items && data.items.length > 0) {
         const lines = data.items.map((r, i) => `${i+1}. ${formatPerformanceReview(r)}`);
         return '\n[ORACLE DATA - PERFORMANCE REVIEWS]\n' + lines.join('\n');
@@ -301,7 +301,7 @@ async function autoFetchData(userMessage) {
     }
 
     if (msg.includes('goal') || msg.includes('objective') || msg.includes('target')) {
-      const data = await backendClient.fetchPersonData('/goals?onlyData=true&limit=20');
+      const data = await oracleFetch('/goals?onlyData=true&limit=20');
       if (data.items && data.items.length > 0) {
         const lines = data.items.map((g, i) => `${i+1}. ${formatGoal(g)}`);
         return '\n[ORACLE DATA - GOALS]\n' + lines.join('\n');
@@ -310,7 +310,7 @@ async function autoFetchData(userMessage) {
     }
 
     if (msg.includes('course') || msg.includes('training') || msg.includes('learning')) {
-      const data = await backendClient.fetchPersonData('/learningCourses?onlyData=true&limit=20');
+      const data = await oracleFetch('/learningCourses?onlyData=true&limit=20');
       if (data.items && data.items.length > 0) {
         const lines = data.items.map((c, i) => `${i+1}. ${formatCourse(c)}`);
         return '\n[ORACLE DATA - LEARNING COURSES]\n' + lines.join('\n');
@@ -319,7 +319,7 @@ async function autoFetchData(userMessage) {
     }
 
     if (msg.includes('enrollment') && (msg.includes('learning') || msg.includes('course') || msg.includes('training'))) {
-      const data = await backendClient.fetchPersonData('/learningEnrollments?onlyData=true&limit=20');
+      const data = await oracleFetch('/learningEnrollments?onlyData=true&limit=20');
       if (data.items && data.items.length > 0) {
         const lines = data.items.map((e, i) => `${i+1}. ${formatLearningEnrollment(e)}`);
         return '\n[ORACLE DATA - LEARNING ENROLLMENTS]\n' + lines.join('\n');
@@ -328,7 +328,7 @@ async function autoFetchData(userMessage) {
     }
 
     if (msg.includes('checklist') || msg.includes('task') || msg.includes('onboarding')) {
-      const data = await backendClient.fetchPersonData('/allocatedChecklists?onlyData=true&limit=20');
+      const data = await oracleFetch('/allocatedChecklists?onlyData=true&limit=20');
       if (data.items && data.items.length > 0) {
         const lines = data.items.map((c, i) => `${i+1}. ${formatChecklist(c)}`);
         return '\n[ORACLE DATA - CHECKLISTS]\n' + lines.join('\n');
@@ -593,9 +593,7 @@ CRITICAL RULES:
   // Save to conversation history
   conversationHistory.push({ role: 'user', content: msg, timestamp: Date.now() });
   conversationHistory.push({ role: 'bot', content: fullText || reply, timestamp: Date.now() });
-  if (backendClient) {
-    try { await backendClient.saveConversationHistory(conversationHistory); } catch {}
-  }
+  try { await window.savvy.invoke('set-conversation-history', JSON.stringify(conversationHistory.slice(-100))); } catch {}
 }
 
 // ── Understand (HCM Discovery) ──
@@ -605,12 +603,12 @@ async function runDiscovery() {
   const statusDiv = document.getElementById('understand-status');
   const summaryDiv = document.getElementById('understand-summary');
 
-  if (!backendClient) {
+  if (!settings.oracleUrl || !settings.oracleUser) {
     statusDiv.style.display = 'block';
     statusDiv.style.background = '#fef2f2';
     statusDiv.style.border = '1px solid #fecaca';
     statusDiv.style.color = '#991b1b';
-    statusDiv.textContent = 'Not signed in. Please sign in with SSO in the Settings tab.';
+    statusDiv.textContent = 'Oracle Fusion not configured. Please enter your URL, username, and password in Settings.';
     return;
   }
 
@@ -632,7 +630,9 @@ async function runDiscovery() {
       progressDiv.appendChild(line);
 
       try {
-        const records = await backendClient.fetchReferenceData(cat);
+        const resourceMap = { department: '/departments', location: '/locations', job: '/jobs', position: '/positions', grade: '/grades' };
+        const data = await oracleFetch(resourceMap[cat] + '?onlyData=true&limit=20');
+        const records = data?.items || [];
         totalRecords += records.length;
         line.textContent = `\u2713 ${cat}: ${records.length} records`;
         line.style.color = '#166534';
@@ -949,8 +949,9 @@ async function expandFromBubble() {
 async function loadSettings() {
   document.getElementById('setOllamaUrl').value = settings.ollamaUrl || '';
   document.getElementById('setOllamaModel').value = settings.ollamaModel || '';
-  document.getElementById('setBackendUrl').value = settings.backendUrl || '';
-  document.getElementById('setTenantId').value = settings.tenantId || '';
+  document.getElementById('setOracleUrl').value = settings.oracleUrl || '';
+  document.getElementById('setOracleUser').value = settings.oracleUser || '';
+  document.getElementById('setOraclePass').value = settings.oraclePass || '';
 
   const statusEl = document.getElementById('status');
   if (statusEl) {
@@ -1077,8 +1078,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const newSettings = {
       ollamaUrl: document.getElementById('setOllamaUrl').value,
       ollamaModel: document.getElementById('setOllamaModel').value,
-      backendUrl: document.getElementById('setBackendUrl').value,
-      tenantId: document.getElementById('setTenantId').value,
+      oracleUrl: document.getElementById('setOracleUrl').value,
+      oracleUser: document.getElementById('setOracleUser').value,
+      oraclePass: document.getElementById('setOraclePass').value,
     };
     settings = { ...settings, ...newSettings };
     await window.savvy.setSettings(settings);
@@ -1087,25 +1089,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     status.textContent = 'Settings saved!';
     status.style.display = 'block';
     setTimeout(() => { status.style.display = 'none'; }, 2000);
-  });
-
-  // SSO Login
-  document.getElementById('ssoLoginBtn').addEventListener('click', async () => {
-    const tenantId = document.getElementById('setTenantId').value;
-    const backendUrl = document.getElementById('setBackendUrl').value;
-    settings = { ...settings, tenantId, backendUrl };
-    await window.savvy.setSettings(settings);
-    const statusEl = document.getElementById('ssoStatus');
-    statusEl.style.display = 'block';
-    try {
-      await window.savvy.loginWithSso(backendUrl, tenantId);
-      await initBackendClient();
-      statusEl.textContent = 'Signed in!';
-      statusEl.style.color = '#166534';
-    } catch (err) {
-      statusEl.textContent = 'Sign-in failed: ' + err.message;
-      statusEl.style.color = '#991b1b';
-    }
   });
 
   await loadSettings();
