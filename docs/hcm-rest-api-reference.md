@@ -1,4 +1,4 @@
-# Oracle HCM REST API Reference
+# Oracle HCM REST API Reference (Official)
 
 ## Base URL Pattern
 ```
@@ -12,9 +12,9 @@ Authorization: Basic base64(username:password)
 
 ---
 
-## Available Endpoints
+## Confirmed Endpoints (from Oracle docs)
 
-### Workers (Employees)
+### Workers
 ```
 GET /workers?onlyData=true&limit=20
 ```
@@ -25,6 +25,22 @@ GET /workers?onlyData=true&limit=20
 GET /absences?onlyData=true&limit=20
 ```
 **Response keys:** AbsenceType, AbsenceTypeName, StartDate, EndDate, AbsenceDays, Duration, AbsenceStatus, ApprovalStatus, AbsenceReason, PersonNumber
+
+### Allocated Checklists
+```
+GET /allocatedChecklists?onlyData=true&limit=20
+```
+**Response keys:** PersonNumber, EmployeeName, ChecklistName, Status, DueDate, CompletionPercentage
+
+### Areas of Responsibility
+```
+GET /areasOfResponsibility?onlyData=true&limit=20
+```
+
+### Assignment Statuses
+```
+GET /assignmentStatuses?onlyData=true&limit=20
+```
 
 ### Departments
 ```
@@ -62,65 +78,30 @@ GET /timeCards?onlyData=true&limit=20
 ```
 **Response keys:** TimeCardId, EmployeeName, PersonNumber, DateStart, DateEnd, StatusCode, ApprovalStatus, TotalRegHours, TotalOthours
 
-### Payroll Elements
+### Payroll Relationships
 ```
-GET /payrollElements?onlyData=true&limit=20
+GET /payrollRelationships?onlyData=true&limit=20
 ```
-**Response keys:** ElementName, PersonNumber, EmployeeName, EffectiveStartDate, Amount, CurrencyCode, PayrollActionCode
 
-### Benefit Enrollments
+### Worker Locations
 ```
-GET /benefitEnrollments?onlyData=true&limit=20
+GET /workerLocations?onlyData=true&limit=20
 ```
-**Response keys:** PersonNumber, EmployeeName, BenefitName, PlanName, EnrollmentStatusCode, EffectiveStartDate
 
-### Performance Reviews
+### Worker Phones
 ```
-GET /performanceReviews?onlyData=true&limit=20
+GET /workerPhones?onlyData=true&limit=20
 ```
-**Response keys:** PersonNumber, EmployeeName, ReviewPeriodName, OverallRating, Status, ReviewDate
 
-### Goals
+### Worker Emails
 ```
-GET /goals?onlyData=true&limit=20
+GET /workerEmails?onlyData=true&limit=20
 ```
-**Response keys:** PersonNumber, EmployeeName, GoalName, GoalType, TargetDate, Status, Weight, PercentageComplete
 
-### Learning Courses
+### Worker Addresses
 ```
-GET /learningCourses?onlyData=true&limit=20
+GET /workerAddresses?onlyData=true&limit=20
 ```
-**Response keys:** CourseId, CourseName, CourseCode, Description, Duration, DurationUnit, Status
-
-### Learning Enrollments
-```
-GET /learningEnrollments?onlyData=true&limit=20
-```
-**Response keys:** PersonNumber, EmployeeName, CourseName, EnrollmentStatus, CompletionDate, Score
-
-### Allocated Checklists
-```
-GET /allocatedChecklists?onlyData=true&limit=20
-```
-**Response keys:** PersonNumber, EmployeeName, ChecklistName, Status, DueDate, CompletionPercentage
-
-### Persons
-```
-GET /persons?onlyData=true&limit=20
-```
-**Response keys:** PersonNumber, DisplayName, FirstName, LastName, DateOfBirth, Gender, MaritalStatus
-
-### Employment
-```
-GET /employment?onlyData=true&limit=20
-```
-**Response keys:** PersonNumber, EmployeeName, EmploymentStatus, WorkerType, HireDate, TerminationDate, LengthOfService
-
-### Organizations
-```
-GET /organizations?onlyData=true&limit=20
-```
-**Response keys:** OrganizationId, Name, OrganizationCode, OrganizationType, Status
 
 ---
 
@@ -129,7 +110,7 @@ GET /organizations?onlyData=true&limit=20
 - `limit=N` — Limits results to N items
 - `offset=N` — Skips first N items (pagination)
 - `q=FieldName=value` — Filters results (e.g., `q=PersonNumber=12345`)
-- `onlyData=true&fields=Field1,Field2` — Returns only specified fields
+- `fields=Field1,Field2` — Returns only specified fields
 
 ## Filtering Examples
 ```
@@ -137,18 +118,4 @@ GET /workers?q=PersonNumber=12345
 GET /absences?q=PersonNumber=12345&onlyData=true
 GET /departments?q=Name=Finance
 GET /locations?q=Country=US
-```
-
-## How to Call from JavaScript (Electron)
-```javascript
-async function oracleFetch(resourcePath) {
-  const url = settings.oracleUrl.replace(/\/+$/, '') 
-    + '/hcmRestApi/resources/11.13.18.05' + resourcePath;
-  const auth = 'Basic ' + btoa(settings.oracleUser + ':' + settings.oraclePass);
-  const resp = await fetch(url, {
-    headers: { Authorization: auth, Accept: 'application/json' }
-  });
-  if (!resp.ok) throw new Error('Oracle API ' + resp.status);
-  return resp.json(); // Returns { items: [...], count: N, ... }
-}
 ```

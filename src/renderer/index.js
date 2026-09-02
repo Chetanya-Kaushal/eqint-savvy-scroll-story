@@ -24,17 +24,23 @@ async function oracleFetch(resourcePath) {
   const baseUrl = settings.oracleUrl.replace(/\/+$/, '');
   const url = baseUrl + '/hcmRestApi/resources/11.13.18.05' + resourcePath;
   const auth = 'Basic ' + btoa(settings.oracleUser + ':' + settings.oraclePass);
+  console.log('[Oracle] Fetching:', url);
   let resp;
   try {
     resp = await fetch(url, { headers: { Authorization: auth, Accept: 'application/json' } });
   } catch (err) {
+    console.error('[Oracle] Network error:', err);
     throw new Error('Network error: ' + err.message + ' — check your Oracle URL is reachable.');
   }
+  console.log('[Oracle] Status:', resp.status, resp.statusText);
   if (!resp.ok) {
     const body = await resp.text().catch(() => '');
+    console.error('[Oracle] Error body:', body);
     throw new Error('Oracle API returned ' + resp.status + ': ' + body.slice(0, 200));
   }
-  return resp.json();
+  const json = await resp.json();
+  console.log('[Oracle] Response keys:', Object.keys(json), 'items count:', json.items?.length);
+  return json;
 }
 
 async function loadInitialState() {
@@ -192,344 +198,99 @@ async function detectVisionModel() {
 async function autoFetchData(userMessage) {
   const msg = userMessage.toLowerCase();
 
-  if (!settings.oracleUrl || !settings.oracleUser) {
-    return '\n[ERROR] Oracle Fusion not configured. Please enter your URL, username, and password in Settings.';
+  if (!settings.oracleUrl || !settings.oracleUser || !settings.oraclePass) {
+    return '[ERROR] Oracle Fusion not configured. Set URL, username, and password in Settings.';
   }
 
-  const oracleKeywords = ['absence', 'leave', 'employee', 'worker', 'team', 'department', 'location', 'job', 'position', 'payroll', 'salary', 'pay', 'benefit', 'insurance', 'time card', 'timesheet', 'hours', 'clock', 'performance', 'review', 'goal', 'learning', 'course', 'training', 'checklist', 'task', 'hcm', 'oracle', 'grade', 'headcount', 'head count', 'hire', 'termination', 'transfer'];
-  const isOracleRelated = oracleKeywords.some(kw => msg.includes(kw));
+  const endpoints = HCM_ENDPOINTS.filter(ep => ep.keywords.some(kw => msg.includes(kw)));
 
-  if (!isOracleRelated) {
-    return '\n[INFO] I can only help with Oracle Fusion HCM questions. Please ask about absences, employees, departments, payroll, benefits, time cards, or other HCM topics.';
+  if (endpoints.length === 0) {
+    const ctx = getDiscoveryContext();
+    if (ctx) return ctx;
+    return '[INFO] No specific data matched. Try asking about employees, absences, departments, jobs, grades, time cards, checklists, etc.';
   }
 
-  let personFilter = '';
-  const personMatch = msg.match(/(?:employee|worker|person|team member)\s+([a-zA-Z0-9\s]+?)(?:\s+in|\s+from|\s+with|\s+for|\s+show|\s+get|\s+list|\s*$)/i);
-  if (personMatch && personMatch[1]) {
-    personFilter = personMatch[1].trim();
+  const results = [];
+  for (const ep of endpoints) {
+    try {
+      const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
+      const auth = 'Basic ' + btoa(settings.oracleUser + ':' + settings.oraclePass);
+      const resp = await fetch(url, { headers: { Authorization: auth, Accept: 'application/json' } });
+      if (!resp.ok) {
+        const body = await resp.text().catch(() => '');
+        throw new Error('HTTP ' + resp.status + ' ' + resp.statusText + (body ? ' — ' + body.slice(0, 200) : ''));
+      }
+      const data = await resp.json();
+      const items = data?.items || [];
+      if (items.length > 0) {
+        results.push(`[ORACLE DATA — ${ep.name}] ${items.length} records found:`);
+        items.slice(0, 10).forEach((item, i) => {
+          const formatted = formatItem(ep.path, item);
+          results.push(`  ${i + 1}. ${formatted}`);
+        });
+      } else {
+        results.push(`[ORACLE DATA — ${ep.name}] No records found.`);
+      }
+    } catch (err) {
+      const cached = discoveryData[ep.path];
+      if (cached && cached.length > 0) {
+        results.push(`[ORACLE DATA — ${ep.name}] ${cached.length} cached records (live fetch failed: ${err.message}):`);
+        cached.slice(0, 10).forEach((item, i) => {
+          const formatted = formatItem(ep.path, item);
+          results.push(`  ${i + 1}. ${formatted}`);
+        });
+      } else {
+        results.push(`[ERROR — ${ep.name}] ${err.message}`);
+      }
+    }
   }
+  return '\n' + results.join('\n');
+}
 
-  try {
-    if (msg.includes('absence') || msg.includes('leave') || msg.includes('time off') || msg.includes('vacation') || msg.includes('sick')) {
-      const data = await oracleFetch('/absences?onlyData=true&limit=20');
-      if (data.items && data.items.length > 0) {
-        const lines = data.items.map((a, i) => `${i+1}. ${formatAbsence(a)}`);
-        return '\n[ORACLE DATA - ABSENCES]\n' + lines.join('\n');
-      }
-      return '\n[ORACLE DATA] No absence records found.';
-    }
+function formatItem(path, item) {
+  const fmt = FORMATTERS[path];
+  if (fmt) return fmt(item);
+  // Fallback: show key fields only
+  const keys = Object.keys(item).filter(k => !k.startsWith('_') && typeof item[k] !== 'object');
+  return keys.slice(0, 6).map(k => `${k}: ${item[k]}`).join(' | ');
+}
 
-    if (msg.includes('employee') || msg.includes('worker') || msg.includes('team') || msg.includes('person') || msg.includes('list') || msg.includes('number') || msg.includes('headcount') || msg.includes('hire')) {
-      const data = await oracleFetch('/workers?onlyData=true&limit=20');
-      if (data.items && data.items.length > 0) {
-        const lines = data.items.map((w, i) => `${i+1}. ${formatWorker(w)}`);
-        return '\n[ORACLE DATA - EMPLOYEES]\n' + lines.join('\n');
-      }
-      return '\n[ORACLE DATA] No employee records found.';
+function getDiscoveryContext() {
+  const parts = [];
+  for (const ep of HCM_ENDPOINTS) {
+    const items = discoveryData[ep.path];
+    if (items && items.length > 0) {
+      parts.push(`[ORACLE DATA — ${ep.name}] ${items.length} records:`);
+      items.slice(0, 3).forEach((item, i) => {
+        const formatted = formatItem(ep.path, item);
+        parts.push(`  ${i + 1}. ${formatted}`);
+      });
     }
-
-    if (msg.includes('department') || msg.includes('dept')) {
-      const data = await oracleFetch('/departments?onlyData=true&limit=20');
-      if (data.items && data.items.length > 0) {
-        const lines = data.items.map((d, i) => `${i+1}. ${formatDepartment(d)}`);
-        return '\n[ORACLE DATA - DEPARTMENTS]\n' + lines.join('\n');
-      }
-      return '\n[ORACLE DATA] No department records found.';
-    }
-
-    if (msg.includes('location') || msg.includes('office') || msg.includes('site')) {
-      const data = await oracleFetch('/locations?onlyData=true&limit=20');
-      if (data.items && data.items.length > 0) {
-        const lines = data.items.map((l, i) => `${i+1}. ${formatLocation(l)}`);
-        return '\n[ORACLE DATA - LOCATIONS]\n' + lines.join('\n');
-      }
-      return '\n[ORACLE DATA] No location records found.';
-    }
-
-    if (msg.includes('job') || msg.includes('role')) {
-      const data = await oracleFetch('/jobs?onlyData=true&limit=20');
-      if (data.items && data.items.length > 0) {
-        const lines = data.items.map((j, i) => `${i+1}. ${formatJob(j)}`);
-        return '\n[ORACLE DATA - JOBS]\n' + lines.join('\n');
-      }
-      return '\n[ORACLE DATA] No job records found.';
-    }
-
-    if (msg.includes('position')) {
-      const data = await oracleFetch('/positions?onlyData=true&limit=20');
-      if (data.items && data.items.length > 0) {
-        const lines = data.items.map((p, i) => `${i+1}. ${formatPosition(p)}`);
-        return '\n[ORACLE DATA - POSITIONS]\n' + lines.join('\n');
-      }
-      return '\n[ORACLE DATA] No position records found.';
-    }
-
-    if (msg.includes('grade') || msg.includes('salary band') || msg.includes('compensation')) {
-      const data = await oracleFetch('/grades?onlyData=true&limit=20');
-      if (data.items && data.items.length > 0) {
-        const lines = data.items.map((g, i) => `${i+1}. ${formatGrade(g)}`);
-        return '\n[ORACLE DATA - GRADES]\n' + lines.join('\n');
-      }
-      return '\n[ORACLE DATA] No grade records found.';
-    }
-
-    if (msg.includes('time card') || msg.includes('timesheet') || msg.includes('hours worked') || msg.includes('clock') || msg.includes('attendance')) {
-      const data = await oracleFetch('/timeCards?onlyData=true&limit=20');
-      if (data.items && data.items.length > 0) {
-        const lines = data.items.map((t, i) => `${i+1}. ${formatTimeCard(t)}`);
-        return '\n[ORACLE DATA - TIME CARDS]\n' + lines.join('\n');
-      }
-      return '\n[ORACLE DATA] No time card records found.';
-    }
-
-    if (msg.includes('payroll') || msg.includes('pay') || msg.includes('salary') || msg.includes('earning') || msg.includes('deduction')) {
-      const data = await oracleFetch('/payrollElements?onlyData=true&limit=20');
-      if (data.items && data.items.length > 0) {
-        const lines = data.items.map((p, i) => `${i+1}. ${formatPayroll(p)}`);
-        return '\n[ORACLE DATA - PAYROLL]\n' + lines.join('\n');
-      }
-      return '\n[ORACLE DATA] No payroll records found.';
-    }
-
-    if (msg.includes('benefit') || msg.includes('insurance') || msg.includes('401k') || msg.includes('enrollment')) {
-      const data = await oracleFetch('/benefitEnrollments?onlyData=true&limit=20');
-      if (data.items && data.items.length > 0) {
-        const lines = data.items.map((b, i) => `${i+1}. ${formatBenefit(b)}`);
-        return '\n[ORACLE DATA - BENEFITS]\n' + lines.join('\n');
-      }
-      return '\n[ORACLE DATA] No benefit records found.';
-    }
-
-    if (msg.includes('performance') || msg.includes('review') || msg.includes('evaluation')) {
-      const data = await oracleFetch('/performanceReviews?onlyData=true&limit=20');
-      if (data.items && data.items.length > 0) {
-        const lines = data.items.map((r, i) => `${i+1}. ${formatPerformanceReview(r)}`);
-        return '\n[ORACLE DATA - PERFORMANCE REVIEWS]\n' + lines.join('\n');
-      }
-      return '\n[ORACLE DATA] No performance review records found.';
-    }
-
-    if (msg.includes('goal') || msg.includes('objective') || msg.includes('target')) {
-      const data = await oracleFetch('/goals?onlyData=true&limit=20');
-      if (data.items && data.items.length > 0) {
-        const lines = data.items.map((g, i) => `${i+1}. ${formatGoal(g)}`);
-        return '\n[ORACLE DATA - GOALS]\n' + lines.join('\n');
-      }
-      return '\n[ORACLE DATA] No goal records found.';
-    }
-
-    if (msg.includes('course') || msg.includes('training') || msg.includes('learning')) {
-      const data = await oracleFetch('/learningCourses?onlyData=true&limit=20');
-      if (data.items && data.items.length > 0) {
-        const lines = data.items.map((c, i) => `${i+1}. ${formatCourse(c)}`);
-        return '\n[ORACLE DATA - LEARNING COURSES]\n' + lines.join('\n');
-      }
-      return '\n[ORACLE DATA] No learning course records found.';
-    }
-
-    if (msg.includes('enrollment') && (msg.includes('learning') || msg.includes('course') || msg.includes('training'))) {
-      const data = await oracleFetch('/learningEnrollments?onlyData=true&limit=20');
-      if (data.items && data.items.length > 0) {
-        const lines = data.items.map((e, i) => `${i+1}. ${formatLearningEnrollment(e)}`);
-        return '\n[ORACLE DATA - LEARNING ENROLLMENTS]\n' + lines.join('\n');
-      }
-      return '\n[ORACLE DATA] No learning enrollment records found.';
-    }
-
-    if (msg.includes('checklist') || msg.includes('task') || msg.includes('onboarding')) {
-      const data = await oracleFetch('/allocatedChecklists?onlyData=true&limit=20');
-      if (data.items && data.items.length > 0) {
-        const lines = data.items.map((c, i) => `${i+1}. ${formatChecklist(c)}`);
-        return '\n[ORACLE DATA - CHECKLISTS]\n' + lines.join('\n');
-      }
-      return '\n[ORACLE DATA] No checklist records found.';
-    }
-  } catch (err) {
-    return '\n[ERROR] ' + err.message;
   }
-
-  return null;
+  return parts.length > 0 ? '\n' + parts.join('\n') : '';
 }
 
-// Format worker data
-function formatWorker(w) {
-  const name = w.DisplayName || ((w.FirstName || '') + ' ' + (w.LastName || '')).trim() || 'N/A';
-  return [
-    `Name: ${name}`,
-    `Person#: ${w.PersonNumber || 'N/A'}`,
-    `Department: ${w.DepartmentName || 'N/A'}`,
-    `Job: ${w.JobName || w.PositionName || 'N/A'}`,
-    `Location: ${w.LocationName || 'N/A'}`,
-    `Status: ${w.EmploymentStatus || w.WorkerType || 'N/A'}`,
-    `Hire Date: ${w.HireDate || w.PeriodOfServiceStartDate || 'N/A'}`,
-    `Email: ${w.WorkEmail || w.EmailAddress || 'N/A'}`,
-    `Phone: ${w.WorkPhone || w.PhoneNumber || 'N/A'}`,
-    `Manager: ${w.ManagerName || 'N/A'}`,
-    `Grade: ${w.GradeName || 'N/A'}`
-  ].filter(x => !x.endsWith('N/A')).join(' | ');
-}
-
-// Format absence data
-function formatAbsence(a) {
-  return [
-    `Type: ${a.AbsenceType || a.AbsenceTypeName || 'N/A'}`,
-    `From: ${a.StartDate || 'N/A'}`,
-    `To: ${a.EndDate || 'N/A'}`,
-    `Days: ${a.AbsenceDays || a.Duration || 'N/A'}`,
-    `Status: ${a.AbsenceStatus || a.ApprovalStatus || 'N/A'}`,
-    `Reason: ${a.AbsenceReason || 'N/A'}`,
-    `Employee: ${a.PersonNumber || 'N/A'}`
-  ].filter(x => !x.endsWith('N/A')).join(' | ');
-}
-
-// Format department data
-function formatDepartment(d) {
-  return [
-    `Name: ${d.Name || d.NameTL || 'N/A'}`,
-    `Code: ${d.DepartmentCode || 'N/A'}`,
-    `Manager: ${d.ManagerName || 'N/A'}`,
-    `Location: ${d.LocationName || 'N/A'}`,
-    `Business Unit: ${d.BusinessUnitName || 'N/A'}`,
-    `Cost Center: ${d.CostCenter || 'N/A'}`
-  ].filter(x => !x.endsWith('N/A')).join(' | ');
-}
-
-// Format location data
-function formatLocation(l) {
-  const address = [l.AddressLine1, l.City, l.Region, l.Country, l.PostalCode].filter(x => x).join(', ');
-  return [
-    `Name: ${l.Name || 'N/A'}`,
-    `Code: ${l.LocationCode || 'N/A'}`,
-    `Address: ${address || 'N/A'}`,
-    `Timezone: ${l.TimeZone || 'N/A'}`
-  ].filter(x => !x.endsWith('N/A')).join(' | ');
-}
-
-// Format job data
-function formatJob(j) {
-  return [
-    `Name: ${j.Name || 'N/A'}`,
-    `Code: ${j.JobCode || 'N/A'}`,
-    `Family: ${j.JobFamilyName || 'N/A'}`,
-    `Category: ${j.JobCategory || 'N/A'}`,
-    `Manager Level: ${j.ManagerLevel || 'N/A'}`
-  ].filter(x => !x.endsWith('N/A')).join(' | ');
-}
-
-// Format time card data
-function formatTimeCard(t) {
-  return [
-    `Period: ${t.PayrollPeriodName || 'N/A'}`,
-    `${t.StartDate || 'N/A'} to ${t.EndDate || 'N/A'}`,
-    `Hours: ${t.TotalHours || 'N/A'}`,
-    `Status: ${t.TimeCardStatus || 'N/A'}`,
-    `Employee: ${t.PersonNumber || 'N/A'}`
-  ].filter(x => !x.endsWith('N/A')).join(' | ');
-}
-
-// Format payroll data
-function formatPayroll(p) {
-  return [
-    `Type: ${p.Name || p.ElementName || 'N/A'}`,
-    `Amount: ${p.Value || p.Amount || 'N/A'} ${p.Currency || ''}`,
-    `Effective: ${p.EffectiveStartDate || 'N/A'}`,
-    `Employee: ${p.PersonNumber || 'N/A'}`
-  ].filter(x => !x.endsWith('N/A')).join(' | ');
-}
-
-// Format benefit data
-function formatBenefit(b) {
-  return [
-    `Plan: ${b.BenefitPlanName || b.PlanName || 'N/A'}`,
-    `Status: ${b.EnrollmentStatus || 'N/A'}`,
-    `Coverage: ${b.CoverageLevel || 'N/A'}`,
-    `Provider: ${b.ProviderName || 'N/A'}`,
-    `Effective: ${b.EffectiveStartDate || 'N/A'}`,
-    `Employee: ${b.PersonNumber || 'N/A'}`
-  ].filter(x => !x.endsWith('N/A')).join(' | ');
-}
-
-// Format position data
-function formatPosition(p) {
-  return [
-    `Name: ${p.Name || 'N/A'}`,
-    `Code: ${p.PositionCode || 'N/A'}`,
-    `Department: ${p.DepartmentName || 'N/A'}`,
-    `Job: ${p.JobName || 'N/A'}`,
-    `Location: ${p.LocationName || 'N/A'}`,
-    `Headcount: ${p.PositionCurrentSize || 0}/${p.PositionMaxSize || 'N/A'}`,
-    `Status: ${p.Status || 'N/A'}`
-  ].filter(x => !x.endsWith('N/A')).join(' | ');
-}
-
-// Format grade data
-function formatGrade(g) {
-  return [
-    `Name: ${g.Name || 'N/A'}`,
-    `Code: ${g.GradeCode || 'N/A'}`,
-    `Min Salary: ${g.MinimumSalary || 'N/A'} ${g.Currency || ''}`,
-    `Max Salary: ${g.MaximumSalary || 'N/A'} ${g.Currency || ''}`,
-    `Status: ${g.Status || 'N/A'}`
-  ].filter(x => !x.endsWith('N/A')).join(' | ');
-}
-
-// Format performance review data
-function formatPerformanceReview(r) {
-  return [
-    `Period: ${r.ReviewPeriod || 'N/A'}`,
-    `Rating: ${r.OverallRating || 'N/A'}`,
-    `Status: ${r.Status || 'N/A'}`,
-    `Reviewer: ${r.ReviewerName || 'N/A'}`,
-    `Employee: ${r.PersonNumber || 'N/A'}`
-  ].filter(x => !x.endsWith('N/A')).join(' | ');
-}
-
-// Format goal data
-function formatGoal(g) {
-  return [
-    `Goal: ${g.GoalName || 'N/A'}`,
-    `Type: ${g.GoalType || 'N/A'}`,
-    `Status: ${g.Status || 'N/A'}`,
-    `Due: ${g.DueDate || 'N/A'}`,
-    `Progress: ${g.Progress || 0}%`,
-    `Employee: ${g.PersonNumber || 'N/A'}`
-  ].filter(x => !x.endsWith('N/A')).join(' | ');
-}
-
-// Format learning course data
-function formatCourse(c) {
-  return [
-    `Course: ${c.CourseName || 'N/A'}`,
-    `Code: ${c.CourseCode || 'N/A'}`,
-    `Category: ${c.Category || 'N/A'}`,
-    `Duration: ${c.Duration || 'N/A'} ${c.DurationUnit || ''}`,
-    `Status: ${c.Status || 'N/A'}`,
-    `Enrollments: ${c.CurrentEnrollments || 0}/${c.MaxEnrollments || 'N/A'}`
-  ].filter(x => !x.endsWith('N/A')).join(' | ');
-}
-
-// Format learning enrollment data
-function formatLearningEnrollment(e) {
-  return [
-    `Course: ${e.CourseName || 'N/A'}`,
-    `Status: ${e.EnrollmentStatus || 'N/A'}`,
-    `Score: ${e.Score || 'N/A'}`,
-    `Completed: ${e.CompletionDate || 'N/A'}`,
-    `Employee: ${e.PersonNumber || 'N/A'}`
-  ].filter(x => !x.endsWith('N/A')).join(' | ');
-}
-
-// Format checklist data
-function formatChecklist(c) {
-  return [
-    `Checklist: ${c.ChecklistName || 'N/A'}`,
-    `Type: ${c.ChecklistType || 'N/A'}`,
-    `Status: ${c.Status || 'N/A'}`,
-    `Due: ${c.DueDate || 'N/A'}`,
-    `Assigned To: ${c.AssignedToName || 'N/A'}`,
-    `Employee: ${c.PersonNumber || 'N/A'}`
-  ].filter(x => !x.endsWith('N/A')).join(' | ');
-}
+const FORMATTERS = {
+  '/workers': (w) => {
+    const name = w.DisplayName || ((w.FirstName || '') + ' ' + (w.LastName || '')).trim() || 'N/A';
+    return `Name: ${name} | Person#: ${w.PersonNumber || 'N/A'} | Dept: ${w.DepartmentName || 'N/A'} | Job: ${w.JobName || w.PositionName || 'N/A'} | Location: ${w.LocationName || 'N/A'} | Status: ${w.EmploymentStatus || w.WorkerType || 'N/A'}`;
+  },
+  '/absences': (a) => `Type: ${a.AbsenceType || a.AbsenceTypeName || 'N/A'} | From: ${a.StartDate || 'N/A'} | To: ${a.EndDate || 'N/A'} | Days: ${a.AbsenceDays || a.Duration || 'N/A'} | Status: ${a.AbsenceStatus || a.ApprovalStatus || 'N/A'} | Employee: ${a.PersonNumber || 'N/A'}`,
+  '/departments': (d) => `Name: ${d.Name || 'N/A'} | Code: ${d.DepartmentCode || 'N/A'} | Manager: ${d.ManagerName || 'N/A'} | Location: ${d.LocationName || 'N/A'}`,
+  '/locations': (l) => `Name: ${l.Name || 'N/A'} | Code: ${l.LocationCode || 'N/A'} | City: ${l.City || 'N/A'} | Country: ${l.Country || 'N/A'}`,
+  '/jobs': (j) => `Name: ${j.Name || 'N/A'} | Code: ${j.JobCode || 'N/A'} | Family: ${j.JobFamilyName || 'N/A'} | Level: ${j.JobLevel || 'N/A'}`,
+  '/positions': (p) => `Name: ${p.Name || 'N/A'} | Code: ${p.PositionCode || 'N/A'} | Dept: ${p.DepartmentName || 'N/A'} | Job: ${p.JobName || 'N/A'}`,
+  '/grades': (g) => `Name: ${g.Name || 'N/A'} | Code: ${g.GradeCode || 'N/A'} | Ladder: ${g.GradeLadderName || 'N/A'}`,
+  '/timeCards': (t) => `Employee: ${t.EmployeeName || 'N/A'} | Person#: ${t.PersonNumber || 'N/A'} | Start: ${t.DateStart || 'N/A'} | End: ${t.DateEnd || 'N/A'} | Hours: ${t.TotalRegHours || 'N/A'} | Status: ${t.StatusCode || 'N/A'}`,
+  '/payrollRelationships': (p) => `Person#: ${p.PersonNumber || 'N/A'} | Name: ${p.EmployeeName || 'N/A'} | Status: ${p.Status || 'N/A'}`,
+  '/allocatedChecklists': (c) => `Name: ${c.ChecklistName || 'N/A'} | Person#: ${c.PersonNumber || 'N/A'} | Status: ${c.Status || 'N/A'} | Due: ${c.DueDate || 'N/A'}`,
+  '/areasOfResponsibility': (r) => `Type: ${r.ResponsibilityType || 'N/A'} | Person#: ${r.PersonNumber || 'N/A'} | Name: ${r.PersonName || 'N/A'}`,
+  '/assignmentStatuses': (s) => `Name: ${s.Name || 'N/A'} | Code: ${s.AssignmentStatusCode || 'N/A'}`,
+  '/workerLocations': (l) => `Person#: ${l.PersonNumber || 'N/A'} | Location: ${l.LocationName || 'N/A'}`,
+  '/workerPhones': (p) => `Person#: ${p.PersonNumber || 'N/A'} | Type: ${p.PhoneType || 'N/A'} | Number: ${p.PhoneNumber || 'N/A'}`,
+  '/workerEmails': (e) => `Person#: ${e.PersonNumber || 'N/A'} | Type: ${e.EmailType || 'N/A'} | Email: ${e.EmailAddress || 'N/A'}`,
+  '/workerAddresses': (a) => `Person#: ${a.PersonNumber || 'N/A'} | Type: ${a.AddressType || 'N/A'} | City: ${a.City || 'N/A'} | Country: ${a.Country || 'N/A'}`,
+};
 
 // ── Chat ──
 let pageContext = '';
@@ -606,67 +367,133 @@ CRITICAL RULES:
 }
 
 // ── Understand (HCM Discovery) ──
+let discoveryData = {};
+let discoveryInterval = null;
+
+const HCM_ENDPOINTS = [
+  { name: 'Workers', path: '/workers', params: '?onlyData=true&limit=20', keywords: ['employee', 'worker', 'person', 'team', 'headcount', 'hire', 'name', 'number'] },
+  { name: 'Absences', path: '/absences', params: '?onlyData=true&limit=20', keywords: ['absence', 'leave', 'time off', 'vacation', 'sick'] },
+  { name: 'Allocated Checklists', path: '/allocatedChecklists', params: '?onlyData=true&limit=20', keywords: ['checklist', 'task', 'onboarding', 'offboarding'] },
+  { name: 'Areas of Responsibility', path: '/areasOfResponsibility', params: '?onlyData=true&limit=20', keywords: ['responsibility', 'representative', 'aor'] },
+  { name: 'Assignment Statuses', path: '/assignmentStatuses', params: '?onlyData=true&limit=20', keywords: ['assignment status', 'status type'] },
+  { name: 'Departments', path: '/departments', params: '?onlyData=true&limit=20', keywords: ['department', 'dept'] },
+  { name: 'Locations', path: '/locations', params: '?onlyData=true&limit=20', keywords: ['location', 'office', 'site', 'address'] },
+  { name: 'Jobs', path: '/jobs', params: '?onlyData=true&limit=20', keywords: ['job', 'role', 'position title'] },
+  { name: 'Positions', path: '/positions', params: '?onlyData=true&limit=20', keywords: ['position', 'posting'] },
+  { name: 'Grades', path: '/grades', params: '?onlyData=true&limit=20', keywords: ['grade', 'level', 'band'] },
+  { name: 'Time Cards', path: '/timeCards', params: '?onlyData=true&limit=20', keywords: ['time card', 'timesheet', 'hours', 'clock'] },
+  { name: 'Payroll Relationships', path: '/payrollRelationships', params: '?onlyData=true&limit=20', keywords: ['payroll', 'salary', 'pay', 'wage'] },
+  { name: 'Worker Locations', path: '/workerLocations', params: '?onlyData=true&limit=20', keywords: ['worker location', 'assignment location'] },
+  { name: 'Worker Phones', path: '/workerPhones', params: '?onlyData=true&limit=20', keywords: ['phone', 'telephone', 'mobile'] },
+  { name: 'Worker Emails', path: '/workerEmails', params: '?onlyData=true&limit=20', keywords: ['email', 'e-mail', 'mail'] },
+  { name: 'Worker Addresses', path: '/workerAddresses', params: '?onlyData=true&limit=20', keywords: ['address', 'home address', 'mailing'] },
+];
+
 async function runDiscovery() {
   const btn = document.getElementById('understandBtn');
   const progressDiv = document.getElementById('understand-progress');
   const statusDiv = document.getElementById('understand-status');
   const summaryDiv = document.getElementById('understand-summary');
 
-  if (!settings.oracleUrl || !settings.oracleUser) {
+  if (!settings.oracleUrl || !settings.oracleUser || !settings.oraclePass) {
     statusDiv.style.display = 'block';
     statusDiv.style.background = '#fef2f2';
     statusDiv.style.border = '1px solid #fecaca';
     statusDiv.style.color = '#991b1b';
-    statusDiv.textContent = 'Oracle Fusion not configured. Please enter your URL, username, and password in Settings.';
+    statusDiv.textContent = 'Oracle Fusion not configured. Set URL, username, and password in Settings.';
     return;
   }
 
   btn.disabled = true;
-  btn.textContent = 'Loading...';
+  btn.textContent = 'Discovering...';
   progressDiv.style.display = 'block';
   progressDiv.innerHTML = '';
   statusDiv.style.display = 'none';
   summaryDiv.style.display = 'none';
 
-  const categories = ['department', 'location', 'job', 'position', 'grade'];
   let totalRecords = 0;
+  let successCount = 0;
+  let failCount = 0;
+  const fetchedData = {};
 
-  try {
-    for (const cat of categories) {
-      const line = document.createElement('div');
-      line.style.cssText = 'font-size:11px;color:#64748b;padding:2px 0;';
-      line.textContent = `\u25CB Fetching ${cat}...`;
-      progressDiv.appendChild(line);
+  for (const ep of HCM_ENDPOINTS) {
+    const line = document.createElement('div');
+    line.style.cssText = 'font-size:11px;color:#64748b;padding:2px 0;';
+    line.textContent = `\u25CB ${ep.name}...`;
+    progressDiv.appendChild(line);
 
-      try {
-        const resourceMap = { department: '/departments', location: '/locations', job: '/jobs', position: '/positions', grade: '/grades' };
-        const data = await oracleFetch(resourceMap[cat] + '?onlyData=true&limit=20');
-        const records = data?.items || [];
-        totalRecords += records.length;
-        line.textContent = `\u2713 ${cat}: ${records.length} records`;
-        line.style.color = '#166534';
-      } catch (err) {
-        line.textContent = `\u2717 ${cat}: ${err.message}`;
-        line.style.color = '#991b1b';
-      }
-      progressDiv.scrollTop = progressDiv.scrollHeight;
+    try {
+      const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
+      const auth = 'Basic ' + btoa(settings.oracleUser + ':' + settings.oraclePass);
+      const resp = await fetch(url, { headers: { Authorization: auth, Accept: 'application/json' } });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      const items = data?.items || [];
+      fetchedData[ep.path] = items;
+      totalRecords += items.length;
+      successCount++;
+      line.textContent = `\u2713 ${ep.name}: ${items.length} records`;
+      line.style.color = '#166534';
+    } catch (err) {
+      failCount++;
+      line.textContent = `\u2717 ${ep.name}: ${err.message}`;
+      line.style.color = '#991b1b';
     }
+    progressDiv.scrollTop = progressDiv.scrollHeight;
+  }
 
-    statusDiv.style.display = 'block';
+  discoveryData = fetchedData;
+
+  statusDiv.style.display = 'block';
+  if (failCount === 0) {
     statusDiv.style.background = '#f0fdf4';
     statusDiv.style.border = '1px solid #bbf7d0';
     statusDiv.style.color = '#166534';
-    statusDiv.textContent = `Loaded! ${totalRecords} reference records from backend.`;
-  } catch (err) {
-    statusDiv.style.display = 'block';
-    statusDiv.style.background = '#fef2f2';
-    statusDiv.style.border = '1px solid #fecaca';
-    statusDiv.style.color = '#991b1b';
-    statusDiv.textContent = 'Load failed: ' + err.message;
+    statusDiv.textContent = `Done! ${successCount}/${HCM_ENDPOINTS.length} endpoints OK, ${totalRecords} total records. Auto-refreshes every 5 min.`;
+  } else {
+    statusDiv.style.background = '#fffbeb';
+    statusDiv.style.border = '1px solid #fde68a';
+    statusDiv.style.color = '#92400e';
+    statusDiv.textContent = `Partial: ${successCount} OK, ${failCount} failed, ${totalRecords} records. Auto-refreshes every 5 min.`;
   }
 
+  // Start auto-refresh every 5 minutes
+  if (discoveryInterval) clearInterval(discoveryInterval);
+  discoveryInterval = setInterval(runDiscoverySilent, 5 * 60 * 1000);
+
   btn.disabled = false;
-  btn.textContent = 'Load Reference Data';
+  btn.textContent = 'Re-Discover Now';
+}
+
+async function runDiscoverySilent() {
+  if (!settings.oracleUrl || !settings.oracleUser || !settings.oraclePass) return;
+  const fetchedData = {};
+  for (const ep of HCM_ENDPOINTS) {
+    try {
+      const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
+      const auth = 'Basic ' + btoa(settings.oracleUser + ':' + settings.oraclePass);
+      const resp = await fetch(url, { headers: { Authorization: auth, Accept: 'application/json' } });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      fetchedData[ep.path] = data?.items || [];
+    } catch {}
+  }
+  discoveryData = fetchedData;
+  console.log('[Discovery] Auto-refreshed', Object.keys(fetchedData).length, 'endpoints');
+}
+
+function getDiscoveryContext() {
+  const parts = [];
+  for (const ep of HCM_ENDPOINTS) {
+    const items = discoveryData[ep.path];
+    if (items && items.length > 0) {
+      parts.push(`[${ep.name} - ${items.length} records]`);
+      items.slice(0, 3).forEach((item, i) => {
+        parts.push(`  ${i + 1}. ${JSON.stringify(item).slice(0, 300)}`);
+      });
+    }
+  }
+  return parts.length > 0 ? parts.join('\n') : '';
 }
 
 // ── Read Page (Vision) ──
