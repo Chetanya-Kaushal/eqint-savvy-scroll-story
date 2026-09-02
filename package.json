@@ -4,8 +4,9 @@
   "description": "EQInt Savvy - Oracle HCM AI Assistant (Desktop Overlay)",
   "main": "src/main.js",
   "scripts": {
+    "prestart": "node scripts/build-renderer.js",
     "start": "electron .",
-    "build": "electron-builder --win",
+    "build": "npm run prestart && electron-builder --win",
     "build:portable": "electron-builder --win portable",
     "test:e2e": "playwright test tests/"
   },
@@ -18,6 +19,7 @@
     "@playwright/test": "^1.62.1",
     "electron": "^30.0.0",
     "electron-builder": "^24.9.1",
+    "esbuild": "^0.28.2",
     "playwright": "^1.62.1"
   },
   "build": {

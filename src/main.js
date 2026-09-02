@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, screen, desktopCapturer, Tray, Menu, globalShortcut, session } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const Store = require('electron-store');
 
 const store = new Store({
@@ -202,6 +203,60 @@ ipcMain.handle('move-overlay-to-corner', () => {
     return true;
   }
   return false;
+});
+
+ipcMain.handle('load-knowledge-base', () => {
+  const result = { hcmApis: null, knowledgeBase: [] };
+  try {
+    const apiPath = path.join(__dirname, '..', 'knowledge', 'hcm-apis.json');
+    if (fs.existsSync(apiPath)) result.hcmApis = JSON.parse(fs.readFileSync(apiPath, 'utf8'));
+  } catch (err) { console.error('Failed to load HCM APIs:', err); }
+  try {
+    const kbPath = path.join(__dirname, '..', 'knowledge', 'hcm.json');
+    if (fs.existsSync(kbPath)) result.knowledgeBase = JSON.parse(fs.readFileSync(kbPath, 'utf8'));
+  } catch (err) { console.error('Failed to load knowledge base:', err); }
+  return result;
+});
+
+ipcMain.handle('load-hcm-data', () => {
+  try {
+    const dataPath = path.join(__dirname, '..', 'hcm-data.json');
+    if (fs.existsSync(dataPath)) return JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+  } catch (err) { console.error('Failed to load HCM data:', err); }
+  return null;
+});
+
+ipcMain.handle('save-hcm-data', (e, data) => {
+  try {
+    const dataPath = path.join(__dirname, '..', 'hcm-data.json');
+    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
+    return true;
+  } catch (err) { console.error('Failed to save HCM data:', err); return false; }
+});
+
+ipcMain.handle('get-conversation-history', () => {
+  try {
+    const historyPath = path.join(__dirname, '..', 'conversation-history.json');
+    if (fs.existsSync(historyPath)) return JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+  } catch (err) { console.error('Failed to load conversation history:', err); }
+  return [];
+});
+
+ipcMain.handle('save-conversation-history', (e, history) => {
+  try {
+    const historyPath = path.join(__dirname, '..', 'conversation-history.json');
+    const trimmed = history.slice(-50);
+    fs.writeFileSync(historyPath, JSON.stringify(trimmed, null, 2));
+    return true;
+  } catch (err) { console.error('Failed to save conversation history:', err); return false; }
+});
+
+const ALLOWED_UI_KEYS = ['isBubbleMode', 'isCollapsed', 'overlayWidth', 'overlayHeight', 'overlayX', 'overlayY'];
+ipcMain.handle('get-ui-state', (e, key) => ALLOWED_UI_KEYS.includes(key) ? store.get(key) : null);
+ipcMain.handle('set-ui-state', (e, { key, value }) => {
+  if (!ALLOWED_UI_KEYS.includes(key)) return false;
+  store.set(key, value);
+  return true;
 });
 
 app.whenReady().then(() => {

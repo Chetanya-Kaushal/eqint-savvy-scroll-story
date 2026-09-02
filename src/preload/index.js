@@ -12,4 +12,11 @@ contextBridge.exposeInMainWorld('savvy', {
   setOverlayPosition: (pos) => ipcRenderer.invoke('set-overlay-position', pos),
   clearBubbleMode: () => ipcRenderer.invoke('clear-bubble-mode'),
   moveOverlayToCorner: () => ipcRenderer.invoke('move-overlay-to-corner'),
+  loadKnowledgeBase: () => ipcRenderer.invoke('load-knowledge-base'),
+  loadHcmData: () => ipcRenderer.invoke('load-hcm-data'),
+  saveHcmData: (data) => ipcRenderer.invoke('save-hcm-data', data),
+  getConversationHistory: () => ipcRenderer.invoke('get-conversation-history'),
+  saveConversationHistory: (history) => ipcRenderer.invoke('save-conversation-history', history),
+  getUiState: (key) => ipcRenderer.invoke('get-ui-state', key),
+  setUiState: (key, value) => ipcRenderer.invoke('set-ui-state', key, value),
 });

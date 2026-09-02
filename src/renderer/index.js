@@ -1,50 +1,40 @@
-const { ipcRenderer } = require('electron');
-const fs = require('fs');
-const path = require('path');
-const Store = require('electron-store');
 const { HCMDiscovery } = require('./hcm-discovery');
 
-const store = new Store();
-let settings = store.get('settings', {
+let settings = {
   ollamaUrl: 'http://localhost:11434',
   ollamaModel: 'phi3:mini',
   oracleUrl: '',
   oracleUser: '',
   oraclePass: '',
   alwaysOnTop: true,
-});
+};
 
 let hcmDiscovery = null;
 let hcmData = null;
+let hcmApis = null;
 let knowledgeBase = [];
 let conversationHistory = [];
 let hcmModules = {};
+let isCollapsed = false;
 
-// Load HCM REST APIs knowledge
+async function loadInitialState() {
+  settings = await window.savvy.getSettings();
+  const kb = await window.savvy.loadKnowledgeBase();
+  hcmApis = kb.hcmApis;
+  knowledgeBase = kb.knowledgeBase;
+  hcmData = await window.savvy.loadHcmData();
+  if (hcmData) hcmDiscovery = new HCMDiscovery(settings);
+  conversationHistory = await window.savvy.getConversationHistory();
+  const collapsed = await window.savvy.getUiState('isCollapsed');
+  if (collapsed) isCollapsed = true;
+}
+
+// Load HCM REST APIs knowledge (uses preloaded hcmApis and loads modules)
 async function loadHcmApis() {
   try {
-    const apiPath = path.join(__dirname, '..', 'knowledge', 'hcm-apis.json');
-    if (fs.existsSync(apiPath)) {
-      hcmApis = JSON.parse(fs.readFileSync(apiPath, 'utf8'));
-    }
-    
-    // Load module index
-    const indexPath = path.join(__dirname, '..', 'knowledge', 'index.json');
-    if (fs.existsSync(indexPath)) {
-      const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
-      
-      // Load each module's fields and examples
-      for (const [key, mod] of Object.entries(index.modules)) {
-        const modulePath = path.join(__dirname, '..', 'knowledge', mod.path);
-        const fieldsPath = path.join(modulePath, 'fields.json');
-        const examplesPath = path.join(modulePath, 'examples.json');
-        
-        hcmModules[key] = {
-          ...mod,
-          fields: fs.existsSync(fieldsPath) ? JSON.parse(fs.readFileSync(fieldsPath, 'utf8')) : null,
-          examples: fs.existsSync(examplesPath) ? JSON.parse(fs.readFileSync(examplesPath, 'utf8')) : null
-        };
-      }
+    // Load module index from hcmApis if available
+    if (hcmApis && hcmApis.modules) {
+      // Module info is already loaded via loadKnowledgeBase
     }
   } catch (err) {
     console.error('Failed to load HCM APIs:', err);
@@ -56,17 +46,17 @@ function searchHcmApis(query) {
   if (!hcmApis) return '';
   const q = query.toLowerCase();
   const matches = [];
-  
-  for (const [key, module] of Object.entries(hcmApis.modules)) {
+
+  for (const [key, module] of Object.entries(hcmApis.modules || {})) {
     if (module.name.toLowerCase().includes(q) || module.description.toLowerCase().includes(q)) {
       matches.push(`\n### ${module.name} (${module.path})`);
       matches.push(module.description);
-      for (const [epKey, ep] of Object.entries(module.endpoints)) {
+      for (const [epKey, ep] of Object.entries(module.endpoints || {})) {
         matches.push(`- ${ep.method} ${ep.path} - ${ep.description}`);
       }
     }
   }
-  
+
   return matches.length > 0 ? matches.join('\n') : '';
 }
 
@@ -80,46 +70,11 @@ function getModuleInfo(topic) {
   }
   return null;
 }
-let isCollapsed = false;
-
-// Try to load cached HCM data
-try {
-  const dataPath = path.join(__dirname, '..', 'hcm-data.json');
-  if (fs.existsSync(dataPath)) {
-    hcmData = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
-    hcmDiscovery = new HCMDiscovery(settings);
-  }
-} catch(e) {}
-
-// Load knowledge base from JSON file
-try {
-  const kbPath = path.join(__dirname, '..', 'knowledge', 'hcm.json');
-  if (fs.existsSync(kbPath)) {
-    knowledgeBase = JSON.parse(fs.readFileSync(kbPath, 'utf8'));
-  }
-} catch(e) { console.log('Failed to load knowledge base:', e); }
-
-// Load conversation history
-try {
-  const historyPath = path.join(__dirname, '..', 'conversation-history.json');
-  if (fs.existsSync(historyPath)) {
-    conversationHistory = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
-  }
-} catch(e) { console.log('Failed to load conversation history:', e); }
-
-function saveConversationHistory() {
-  try {
-    const historyPath = path.join(__dirname, '..', 'conversation-history.json');
-    // Keep only last 50 messages to prevent file from growing too large
-    const trimmedHistory = conversationHistory.slice(-50);
-    fs.writeFileSync(historyPath, JSON.stringify(trimmedHistory, null, 2));
-  } catch(e) { console.log('Failed to save conversation history:', e); }
-}
 
 // ── Knowledge Base ──
 function findKnowledge(query) {
   const q = query.toLowerCase();
-  
+
   // Search through loaded knowledge base
   for (const item of knowledgeBase) {
     if (item.title && item.content) {
@@ -130,7 +85,7 @@ function findKnowledge(query) {
       }
     }
   }
-  
+
   // Fallback to API reference knowledge
   const apiDocs = [
     { k: ['employee','worker','person'], v: 'GET /hcmRestApi/resources/latest/emps - Workers. Fields: PersonId, DisplayName, FirstName, LastName, EmailAddress, JobName, DepartmentName, LocationName, HireDate, ActionReason, Action.' },
@@ -206,11 +161,11 @@ async function callOracleApi(method, resourcePath, body = null) {
   if (!settings.oracleUrl || !settings.oracleUser || !settings.oraclePass) {
     return { error: 'Oracle credentials not configured. Please set your Oracle URL, username, and password in the Settings tab.' };
   }
-  
+
   try {
     const url = settings.oracleUrl + '/hcmRestApi/resources/11.13.18.05' + resourcePath;
     const auth = 'Basic ' + btoa(settings.oracleUser + ':' + settings.oraclePass);
-    
+
     const options = {
       method: method,
       headers: {
@@ -219,18 +174,18 @@ async function callOracleApi(method, resourcePath, body = null) {
         'Accept': 'application/json'
       }
     };
-    
+
     if (body && (method === 'POST' || method === 'PATCH' || method === 'PUT')) {
       options.body = JSON.stringify(body);
     }
-    
+
     const resp = await fetch(url, options);
     const data = await resp.json();
-    
+
     if (!resp.ok) {
       return { error: `Oracle API error: ${data.title || resp.statusText || resp.status}` };
     }
-    
+
     return data;
   } catch (err) {
     return { error: 'Failed to connect to Oracle: ' + err.message };
@@ -434,27 +389,27 @@ function formatChecklist(c) {
 // ── Main Auto-Fetch Function ──
 async function autoFetchData(userMessage) {
   const msg = userMessage.toLowerCase();
-  
+
   // Check if Oracle is configured
   if (!settings.oracleUrl || !settings.oracleUser || !settings.oraclePass) {
     return '\n[ERROR] Oracle credentials not configured. Please set your Oracle URL, username, and password in the Settings tab.';
   }
-  
+
   // Check if question is related to Oracle HCM
   const oracleKeywords = ['absence', 'leave', 'employee', 'worker', 'team', 'department', 'location', 'job', 'position', 'payroll', 'salary', 'pay', 'benefit', 'insurance', 'time card', 'timesheet', 'hours', 'clock', 'performance', 'review', 'goal', 'learning', 'course', 'training', 'checklist', 'task', 'hcm', 'oracle', 'grade', 'headcount', 'head count', 'hire', 'termination', 'transfer'];
   const isOracleRelated = oracleKeywords.some(kw => msg.includes(kw));
-  
+
   if (!isOracleRelated) {
     return '\n[INFO] I can only help with Oracle Fusion HCM questions. Please ask about absences, employees, departments, payroll, benefits, time cards, or other HCM topics.';
   }
-  
+
   // Extract person name/number if mentioned
   let personFilter = '';
   const personMatch = msg.match(/(?:employee|worker|person|team member)\s+([a-zA-Z0-9\s]+?)(?:\s+in|\s+from|\s+with|\s+for|\s+show|\s+get|\s+list|\s*$)/i);
   if (personMatch && personMatch[1]) {
     personFilter = personMatch[1].trim();
   }
-  
+
   // ABSENCES
   if (msg.includes('absence') || msg.includes('leave') || msg.includes('time off') || msg.includes('vacation') || msg.includes('sick')) {
     let endpoint = '/absences?onlyData=true&limit=20';
@@ -472,7 +427,7 @@ async function autoFetchData(userMessage) {
     }
     return '\n[ORACLE DATA] No absence records found.';
   }
-  
+
   // EMPLOYEES/WORKERS
   if (msg.includes('employee') || msg.includes('worker') || msg.includes('team') || msg.includes('person') || msg.includes('list') || msg.includes('number') || msg.includes('headcount') || msg.includes('hire')) {
     let endpoint = '/workers?onlyData=true&limit=20';
@@ -487,7 +442,7 @@ async function autoFetchData(userMessage) {
     }
     return '\n[ORACLE DATA] No employee records found.';
   }
-  
+
   // DEPARTMENTS
   if (msg.includes('department') || msg.includes('dept')) {
     let endpoint = '/departments?onlyData=true&limit=20';
@@ -499,7 +454,7 @@ async function autoFetchData(userMessage) {
     }
     return '\n[ORACLE DATA] No department records found.';
   }
-  
+
   // LOCATIONS
   if (msg.includes('location') || msg.includes('office') || msg.includes('site')) {
     let endpoint = '/locations?onlyData=true&limit=20';
@@ -511,7 +466,7 @@ async function autoFetchData(userMessage) {
     }
     return '\n[ORACLE DATA] No location records found.';
   }
-  
+
   // JOBS
   if (msg.includes('job') || msg.includes('role')) {
     let endpoint = '/jobs?onlyData=true&limit=20';
@@ -523,7 +478,7 @@ async function autoFetchData(userMessage) {
     }
     return '\n[ORACLE DATA] No job records found.';
   }
-  
+
   // POSITIONS
   if (msg.includes('position')) {
     let endpoint = '/positions?onlyData=true&limit=20';
@@ -535,7 +490,7 @@ async function autoFetchData(userMessage) {
     }
     return '\n[ORACLE DATA] No position records found.';
   }
-  
+
   // GRADES
   if (msg.includes('grade') || msg.includes('salary band') || msg.includes('compensation')) {
     let endpoint = '/grades?onlyData=true&limit=20';
@@ -547,7 +502,7 @@ async function autoFetchData(userMessage) {
     }
     return '\n[ORACLE DATA] No grade records found.';
   }
-  
+
   // TIME CARDS
   if (msg.includes('time card') || msg.includes('timesheet') || msg.includes('hours worked') || msg.includes('clock') || msg.includes('attendance')) {
     let endpoint = '/timeCards?onlyData=true&limit=20';
@@ -565,7 +520,7 @@ async function autoFetchData(userMessage) {
     }
     return '\n[ORACLE DATA] No time card records found.';
   }
-  
+
   // PAYROLL
   if (msg.includes('payroll') || msg.includes('pay') || msg.includes('salary') || msg.includes('earning') || msg.includes('deduction')) {
     let endpoint = '/payrollElements?onlyData=true&limit=20';
@@ -583,7 +538,7 @@ async function autoFetchData(userMessage) {
     }
     return '\n[ORACLE DATA] No payroll records found.';
   }
-  
+
   // BENEFITS
   if (msg.includes('benefit') || msg.includes('insurance') || msg.includes('401k') || msg.includes('enrollment')) {
     let endpoint = '/benefitEnrollments?onlyData=true&limit=20';
@@ -601,7 +556,7 @@ async function autoFetchData(userMessage) {
     }
     return '\n[ORACLE DATA] No benefit records found.';
   }
-  
+
   // PERFORMANCE REVIEWS
   if (msg.includes('performance') || msg.includes('review') || msg.includes('evaluation')) {
     let endpoint = '/performanceReviews?onlyData=true&limit=20';
@@ -619,7 +574,7 @@ async function autoFetchData(userMessage) {
     }
     return '\n[ORACLE DATA] No performance review records found.';
   }
-  
+
   // GOALS
   if (msg.includes('goal') || msg.includes('objective') || msg.includes('target')) {
     let endpoint = '/goals?onlyData=true&limit=20';
@@ -637,7 +592,7 @@ async function autoFetchData(userMessage) {
     }
     return '\n[ORACLE DATA] No goal records found.';
   }
-  
+
   // LEARNING COURSES
   if (msg.includes('course') || msg.includes('training') || msg.includes('learning')) {
     let endpoint = '/learningCourses?onlyData=true&limit=20';
@@ -649,7 +604,7 @@ async function autoFetchData(userMessage) {
     }
     return '\n[ORACLE DATA] No learning course records found.';
   }
-  
+
   // LEARNING ENROLLMENTS
   if (msg.includes('enrollment') && (msg.includes('learning') || msg.includes('course') || msg.includes('training'))) {
     let endpoint = '/learningEnrollments?onlyData=true&limit=20';
@@ -667,7 +622,7 @@ async function autoFetchData(userMessage) {
     }
     return '\n[ORACLE DATA] No learning enrollment records found.';
   }
-  
+
   // CHECKLISTS
   if (msg.includes('checklist') || msg.includes('task') || msg.includes('onboarding')) {
     let endpoint = '/allocatedChecklists?onlyData=true&limit=20';
@@ -685,13 +640,12 @@ async function autoFetchData(userMessage) {
     }
     return '\n[ORACLE DATA] No checklist records found.';
   }
-  
+
   return null;
 }
 
 // ── Chat ──
 let pageContext = '';
-let hcmApis = null;
 
 async function sendMessage() {
   const input = document.getElementById('chatInput');
@@ -751,17 +705,17 @@ CRITICAL RULES:
 
   const botMsg = addMessage('', 'bot');
   let fullText = '';
-  
+
   const reply = await callLLM(messages, (chunk) => {
     fullText += chunk;
     botMsg.querySelector('.msg-text').textContent = fullText;
     document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
   });
-  
+
   // Save to conversation history
   conversationHistory.push({ role: 'user', content: msg, timestamp: Date.now() });
   conversationHistory.push({ role: 'bot', content: fullText || reply, timestamp: Date.now() });
-  saveConversationHistory();
+  await window.savvy.saveConversationHistory(conversationHistory);
 }
 
 // ── Understand (HCM Discovery) ──
@@ -803,10 +757,7 @@ async function runDiscovery() {
     const data = await hcmDiscovery.runAll();
     hcmData = data;
 
-    try {
-      const dataPath = path.join(__dirname, '..', 'hcm-data.json');
-      fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
-    } catch(e) { console.log('Failed to cache HCM data:', e); }
+    await window.savvy.saveHcmData(data);
 
     const summary = hcmDiscovery.buildSummary();
     const totalRecords = Object.values(data).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
@@ -848,12 +799,12 @@ async function loadWindows() {
   backBtn.style.display = 'none';
   list.innerHTML = '<div style="color:#64748b;font-size:11px;">Loading windows...</div>';
 
-  const sources = await ipcRenderer.invoke('get-window-sources');
+  const sources = await window.savvy.getWindowSources();
   list.innerHTML = '';
 
   const refreshHtml = '<button class="read-btn" id="refreshWindows" style="margin:0 0 8px 0;width:100%;">Refresh Windows</button>';
   list.innerHTML = '<div class="setting-label" style="margin-bottom:8px;">Select a window to read:</div><div id="windows-container"></div>' + refreshHtml;
-  
+
   document.getElementById('refreshWindows').addEventListener('click', loadWindows);
 
   const container = document.getElementById('windows-container');
@@ -898,7 +849,7 @@ async function captureWindow(source, isLive = false) {
     statusDiv.style.cssText = 'padding:8px;margin-bottom:8px;border-radius:6px;font-size:11px;';
     readContent.insertBefore(statusDiv, readContent.firstChild);
   }
-  
+
   // Create or get image container
   let imgContainer = document.getElementById('read-img-container');
   if (!imgContainer) {
@@ -912,8 +863,8 @@ async function captureWindow(source, isLive = false) {
   statusDiv.style.color = isLive ? '#0070F3' : '#64748b';
 
   try {
-    const dataUrl = await ipcRenderer.invoke('capture-window', source.id);
-    
+    const dataUrl = await window.savvy.captureWindow(source.id);
+
     // Update image
     imgContainer.innerHTML = '';
     const img = document.createElement('img');
@@ -1006,16 +957,16 @@ Be thorough and specific. Use actual text from the screenshot.`;
 
 function startLiveRead() {
   if (!selectedWindow || isLiveReading) return;
-  
+
   isLiveReading = true;
-  
+
   // Update UI - show stop button
   const liveBtn = document.getElementById('liveReadBtn');
   if (liveBtn) {
     liveBtn.textContent = 'Stop Live';
     liveBtn.classList.add('live-active');
   }
-  
+
   // Capture immediately, then every 3 seconds
   captureWindow(selectedWindow, true);
   liveReadInterval = setInterval(() => {
@@ -1031,14 +982,14 @@ function stopLiveRead() {
     clearInterval(liveReadInterval);
     liveReadInterval = null;
   }
-  
+
   // Update UI - show live button
   const liveBtn = document.getElementById('liveReadBtn');
   if (liveBtn) {
     liveBtn.textContent = 'Live Read';
     liveBtn.classList.remove('live-active');
   }
-  
+
   // Update status
   const statusDiv = document.getElementById('read-status');
   if (statusDiv) {
@@ -1062,70 +1013,70 @@ function addMessage(text, who) {
 function removeThinking(el) { if (el && el.parentNode) el.parentNode.removeChild(el); }
 
 // ── Collapse/Expand ──
-function toggleCollapse() {
+async function toggleCollapse() {
   const app = document.getElementById('app');
   const bubbleOverlay = document.getElementById('bubble-overlay');
-  
+
   isCollapsed = !isCollapsed;
-  
+
   if (isCollapsed) {
     stopLiveRead();
     // Switch to bubble mode - hide app, show bubble overlay
     app.style.display = 'none';
     bubbleOverlay.style.display = 'block';
-    store.set('isCollapsed', true);
-    
+    await window.savvy.setUiState('isCollapsed', true);
+
     // Move window to bottom-right corner (saves current size first)
-    ipcRenderer.invoke('move-overlay-to-corner');
+    await window.savvy.moveOverlayToCorner();
   } else {
-    expandFromBubble();
+    await expandFromBubble();
   }
 }
 
 // Expand from bubble
-function expandFromBubble() {
+async function expandFromBubble() {
   console.log('expandFromBubble called');
   const app = document.getElementById('app');
   const bubbleOverlay = document.getElementById('bubble-overlay');
-  
+
   isCollapsed = false;
   app.style.display = 'flex';
   bubbleOverlay.style.display = 'none';
-  store.set('isCollapsed', false);
-  
+  await window.savvy.setUiState('isCollapsed', false);
+
   // Clear bubble mode flag first so resize handler doesn't overwrite
-  ipcRenderer.invoke('clear-bubble-mode');
-  
+  await window.savvy.clearBubbleMode();
+
   // Get saved size from store
   const restoreSize = {
-    width: store.get('overlayWidth', 420),
-    height: store.get('overlayHeight', 750)
+    width: await window.savvy.getUiState('overlayWidth') || 420,
+    height: await window.savvy.getUiState('overlayHeight') || 750
   };
-  
+
   // Get saved position from store
   const restorePos = {
-    x: store.get('overlayX'),
-    y: store.get('overlayY')
+    x: await window.savvy.getUiState('overlayX'),
+    y: await window.savvy.getUiState('overlayY')
   };
-  
+
   console.log('Restoring size:', restoreSize, 'position:', restorePos);
-  
+
   // Restore window size and position
-  ipcRenderer.invoke('set-overlay-size', restoreSize);
-  
+  await window.savvy.setOverlaySize(restoreSize);
+
   if (restorePos.x !== null && restorePos.y !== null) {
-    ipcRenderer.invoke('set-overlay-position', restorePos);
+    await window.savvy.setOverlayPosition(restorePos);
   }
 }
 
 // ── Settings ──
-function loadSettings() {
+async function loadSettings() {
   document.getElementById('setOllamaUrl').value = settings.ollamaUrl || '';
   document.getElementById('setOllamaModel').value = settings.ollamaModel || '';
   document.getElementById('setOracleUrl').value = settings.oracleUrl || '';
   document.getElementById('setOracleUser').value = settings.oracleUser || '';
   document.getElementById('setOraclePass').value = settings.oraclePass || '';
-  
+
   // Update status display
   const statusEl = document.getElementById('status');
   if (statusEl) {
@@ -1137,9 +1088,9 @@ function loadSettings() {
       statusEl.style.color = '#64748b';
     }
   }
-  
+
   // Restore collapsed state
-  const wasCollapsed = store.get('isCollapsed', false);
+  const wasCollapsed = await window.savvy.getUiState('isCollapsed');
   if (wasCollapsed) {
     const app = document.getElementById('app');
     const bubbleOverlay = document.getElementById('bubble-overlay');
@@ -1147,18 +1098,28 @@ function loadSettings() {
     bubbleOverlay.style.display = 'block';
     isCollapsed = true;
     // Move to corner on startup
-    ipcRenderer.invoke('move-overlay-to-corner');
+    await window.savvy.moveOverlayToCorner();
   }
 }
 
 // ── Init ──
-document.addEventListener('DOMContentLoaded', () => {
-  // Load HCM REST APIs knowledge (fire and forget)
-  loadHcmApis().catch(() => {});
-  
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadInitialState();
+
+  // Brand icon fallback
+  document.querySelectorAll('.brand-icon').forEach(img => {
+    img.addEventListener('error', () => {
+      img.style.display = 'none';
+      const span = document.createElement('span');
+      span.style.cssText = `font-weight:700;font-size:${img.dataset.fallbackSize};color:${img.dataset.fallbackColor};`;
+      span.textContent = 'EQ';
+      img.parentNode.appendChild(span);
+    });
+  });
+
   // Close button
   document.getElementById('closeBtn').addEventListener('click', () => {
-    ipcRenderer.send('close-overlay');
+    window.savvy.closeOverlay();
   });
 
   // Collapse button
@@ -1171,11 +1132,6 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       tab.classList.add('active');
       document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
-      
-      // Load windows when switching to settings (for Read Page section)
-      if (tab.dataset.tab === 'settings') {
-        // Don't auto-load, wait for section to be expanded
-      }
     });
   });
 
@@ -1185,7 +1141,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const content = document.getElementById('readSectionContent');
     header.classList.toggle('expanded');
     content.classList.toggle('expanded');
-    
+
     // Load windows when expanding Read Page section
     if (content.classList.contains('expanded')) {
       loadWindows();
@@ -1231,7 +1187,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('backToWindows').style.display = 'none';
     loadWindows();
   });
-  
+
   // Live Read button
   document.getElementById('liveReadBtn').addEventListener('click', () => {
     if (isLiveReading) {
@@ -1254,7 +1210,7 @@ document.addEventListener('DOMContentLoaded', () => {
       oraclePass: document.getElementById('setOraclePass').value,
     };
     settings = { ...settings, ...newSettings };
-    store.set('settings', settings);
+    await window.savvy.setSettings(settings);
 
     const status = document.getElementById('savedMsg');
     status.textContent = 'Settings saved!';
@@ -1267,17 +1223,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  loadSettings();
-  
+  await loadSettings();
+
   // Bubble overlay click handler - add to multiple elements for reliability
   const bubbleOverlay = document.getElementById('bubble-overlay');
   const bubbleContainer = document.querySelector('.bubble-container');
   const moon = document.querySelector('.moon');
-  
+
   bubbleOverlay.addEventListener('click', expandFromBubble);
   if (bubbleContainer) bubbleContainer.addEventListener('click', expandFromBubble);
   if (moon) moon.addEventListener('click', expandFromBubble);
-  
+
   // Load conversation history
   if (conversationHistory.length > 0) {
     const container = document.getElementById('messages');
