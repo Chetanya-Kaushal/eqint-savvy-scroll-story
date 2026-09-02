@@ -19,12 +19,21 @@ let isCollapsed = false;
 
 async function oracleFetch(resourcePath) {
   if (!settings.oracleUrl || !settings.oracleUser || !settings.oraclePass) {
-    return null;
+    throw new Error('Oracle credentials not configured. Set URL, username, and password in Settings.');
   }
-  const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + resourcePath;
+  const baseUrl = settings.oracleUrl.replace(/\/+$/, '');
+  const url = baseUrl + '/hcmRestApi/resources/11.13.18.05' + resourcePath;
   const auth = 'Basic ' + btoa(settings.oracleUser + ':' + settings.oraclePass);
-  const resp = await fetch(url, { headers: { Authorization: auth, Accept: 'application/json' } });
-  if (!resp.ok) return null;
+  let resp;
+  try {
+    resp = await fetch(url, { headers: { Authorization: auth, Accept: 'application/json' } });
+  } catch (err) {
+    throw new Error('Network error: ' + err.message + ' — check your Oracle URL is reachable.');
+  }
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '');
+    throw new Error('Oracle API returned ' + resp.status + ': ' + body.slice(0, 200));
+  }
   return resp.json();
 }
 
