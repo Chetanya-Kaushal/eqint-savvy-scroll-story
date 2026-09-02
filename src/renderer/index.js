@@ -597,6 +597,11 @@ CRITICAL RULES:
     dataDiv.innerHTML = `<div class="msg-avatar">EQ</div><div class="msg-text">${htmlSections}</div>`;
     container.appendChild(dataDiv);
     container.scrollTop = container.scrollHeight;
+    // Data already shown — skip LLM call
+    conversationHistory.push({ role: 'user', content: msg, timestamp: Date.now() });
+    conversationHistory.push({ role: 'bot', content: '[Data displayed in formatted list]', timestamp: Date.now() });
+    try { await window.savvy.invoke('set-conversation-history', JSON.stringify(conversationHistory.slice(-100))); } catch {}
+    return;
   }
 
   const botMsg = addMessage('', 'bot');
