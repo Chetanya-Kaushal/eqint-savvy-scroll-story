@@ -30,9 +30,23 @@
   "build": {
     "appId": "com.eqint.savvy-desktop",
     "productName": "EQInt Savvy",
+    "afterSign": "scripts/notarize.js",
     "win": {
-      "target": "portable",
+      "target": ["nsis", "portable"],
       "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": false,
+      "runAfterFinish": false
     },
     "portable": {
       "artifactName": "EQInt Savvy.exe"
