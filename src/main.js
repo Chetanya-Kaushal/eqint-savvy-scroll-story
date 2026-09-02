@@ -41,10 +41,17 @@ function createOverlay() {
   // Default position: centered vertically, offset slightly right
   const savedX = store.get('overlayX');
   const savedY = store.get('overlayY');
-  const defaultW = 420;
-  const defaultH = 750;
-  const posX = savedX !== null ? savedX : Math.round((screenW - defaultW) / 2) + 60;
-  const posY = savedY !== null ? savedY : Math.round((screenH - defaultH) / 2);
+  const defaultW = store.get('overlayWidth') || 420;
+  const defaultH = store.get('overlayHeight') || 750;
+  // Auto-center if saved position is off-screen or in corner
+  let posX = savedX;
+  let posY = savedY;
+  if (posX === null || posY === null || posX > screenW - 100 || posY > screenH - 100 || posX < -10 || posY < -10) {
+    posX = Math.round((screenW - defaultW) / 2) + 60;
+    posY = Math.round((screenH - defaultH) / 2);
+    store.set('overlayX', posX);
+    store.set('overlayY', posY);
+  }
 
   overlayWindow = new BrowserWindow({
     width: store.get('overlayWidth') || defaultW,
