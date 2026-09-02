@@ -1,5 +1,5 @@
-const { describe, it, expect } = require('vitest');
-const { makeTokenStore } = require('../../src/main/token-store');
+import { describe, it, expect } from 'vitest';
+import { makeTokenStore } from '../../src/main/token-store.js';
 
 function fakeKeytar() {
   const store = new Map();

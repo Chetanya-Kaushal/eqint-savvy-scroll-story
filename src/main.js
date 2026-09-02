@@ -10,9 +10,8 @@ const store = new Store({
     settings: {
       ollamaUrl: 'http://localhost:11434',
       ollamaModel: 'phi3:mini',
-      oracleUrl: '',
-      oracleUser: '',
-      oraclePass: '',
+      backendUrl: '',
+      tenantId: '',
       alwaysOnTop: true,
     },
     overlayX: null,
@@ -93,16 +92,10 @@ function createTray() {
 }
 
 // IPC handlers
-ipcMain.handle('get-settings', () => {
-  const settings = store.get('settings');
-  return { ...settings, oraclePass: secureStorage.decryptField(settings.oraclePass) };
-});
+ipcMain.handle('get-settings', () => store.get('settings'));
 ipcMain.handle('set-settings', (e, newSettings) => {
   const currentSettings = store.get('settings');
   const updatedSettings = { ...currentSettings, ...newSettings };
-  if (newSettings.oraclePass !== undefined) {
-    updatedSettings.oraclePass = secureStorage.encryptField(newSettings.oraclePass);
-  }
   store.set('settings', updatedSettings);
   return true;
 });
@@ -226,30 +219,6 @@ ipcMain.handle('load-knowledge-base', () => {
   return result;
 });
 
-ipcMain.handle('load-hcm-data', () => {
-  try {
-    return secureStorage.readEncryptedFile(path.join(__dirname, '..', 'hcm-data.json'));
-  } catch (err) { console.error('Failed to load HCM data:', err); return null; }
-});
-ipcMain.handle('save-hcm-data', (e, data) => {
-  try {
-    secureStorage.writeEncryptedFile(path.join(__dirname, '..', 'hcm-data.json'), data);
-    return true;
-  } catch (err) { console.error('Failed to save HCM data:', err); return false; }
-});
-
-ipcMain.handle('get-conversation-history', () => {
-  try {
-    return secureStorage.readEncryptedFile(path.join(__dirname, '..', 'conversation-history.json')) || [];
-  } catch (err) { console.error('Failed to load conversation history:', err); return []; }
-});
-ipcMain.handle('save-conversation-history', (e, history) => {
-  try {
-    secureStorage.writeEncryptedFile(path.join(__dirname, '..', 'conversation-history.json'), history.slice(-50));
-    return true;
-  } catch (err) { console.error('Failed to save conversation history:', err); return false; }
-});
-
 const { loginWithSso, getAuthState, logout } = require('./main/auth');
 ipcMain.handle('login-with-sso', (e, { backendUrl, tenantId }) => loginWithSso(backendUrl, tenantId));
 ipcMain.handle('get-auth-state', () => getAuthState());
@@ -268,7 +237,7 @@ app.whenReady().then(() => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': ["default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:11434 http://127.0.0.1:11434"],
+        'Content-Security-Policy': ["default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:* https://localhost:* http://127.0.0.1:* https://*"],
       },
     });
   });

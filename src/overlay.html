@@ -371,17 +371,15 @@ body {
       <input class="setting-input" id="setOllamaModel" value="phi3:mini" />
     </div>
     <div class="setting-group">
-      <div class="setting-label">Oracle URL</div>
-      <input class="setting-input" id="setOracleUrl" placeholder="https://your-oracle-cloud.com" />
+      <div class="setting-label">Backend URL</div>
+      <input class="setting-input" id="setBackendUrl" placeholder="https://savvy-api.yourcompany.com" />
     </div>
     <div class="setting-group">
-      <div class="setting-label">Oracle Username</div>
-      <input class="setting-input" id="setOracleUser" placeholder="username" />
+      <div class="setting-label">Tenant ID</div>
+      <input class="setting-input" id="setTenantId" placeholder="provided by your IT admin" />
     </div>
-    <div class="setting-group">
-      <div class="setting-label">Oracle Password</div>
-      <input class="setting-input" id="setOraclePass" type="password" placeholder="password" />
-    </div>
+    <button class="save-btn" id="ssoLoginBtn">Sign in with SSO</button>
+    <div class="saved-msg" id="ssoStatus" style="display:none;"></div>
     <div class="saved-msg" id="savedMsg">Settings saved!</div>
     <button class="save-btn" id="saveBtn">Save Settings</button>
 

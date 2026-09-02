@@ -1,29 +1,28 @@
 const http = require('http');
 const { URL } = require('url');
 const { shell } = require('electron');
-const { Issuer, generators } = require('openid-client');
 const keytar = require('keytar');
 const { makeTokenStore } = require('./token-store');
 
 const tokenStore = makeTokenStore(keytar);
 
 async function loginWithSso(backendUrl, tenantId) {
+  const { discovery, buildAuthorizationUrl, calculatePKCECodeChallenge, randomPKCECodeVerifier, randomState, authorizationCodeGrant } = await import('openid-client');
+
   const configResponse = await fetch(`${backendUrl}/tenants/${tenantId}/oidc-config`);
   if (!configResponse.ok) throw new Error('Tenant SSO is not configured on the backend');
   const { issuerUrl, clientId, redirectUri } = await configResponse.json();
 
-  const issuer = await Issuer.discover(issuerUrl);
-  const client = new issuer.Client({
-    client_id: clientId,
-    redirect_uris: [redirectUri],
-    response_types: ['code'],
-    token_endpoint_auth_method: 'none',
+  const config = await discovery(new URL(issuerUrl), clientId, undefined, undefined, {
+    [discovery.INSECURE_ALLOW_HTTP]: true,
   });
 
-  const codeVerifier = generators.codeVerifier();
-  const codeChallenge = generators.codeChallenge(codeVerifier);
-  const state = generators.state();
-  const authUrl = client.authorizationUrl({
+  const codeVerifier = randomPKCECodeVerifier();
+  const codeChallenge = await calculatePKCECodeChallenge(codeVerifier);
+  const state = randomState();
+
+  const authUrl = buildAuthorizationUrl(config, {
+    redirect_uri: redirectUri,
     scope: 'openid email profile',
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
@@ -34,12 +33,17 @@ async function loginWithSso(backendUrl, tenantId) {
   const ssoIdToken = await new Promise((resolve, reject) => {
     const server = http.createServer(async (req, res) => {
       try {
-        const params = client.callbackParams(req);
-        if (params.state !== state) throw new Error('OAuth state mismatch');
-        const tokenSet = await client.callback(redirectUri, params, { code_verifier: codeVerifier, state });
+        const reqUrl = new URL(req.url, `http://127.0.0.1:${redirectPort}`);
+        const params = reqUrl.searchParams;
+        if (params.get('state') !== state) throw new Error('OAuth state mismatch');
+        const tokenResponse = await authorizationCodeGrant(config, reqUrl, {
+          redirect_uri: redirectUri,
+          code_verifier: codeVerifier,
+          expectedNonce: undefined,
+        });
         res.end('Login successful — you can close this window and return to Savvy.');
         server.close();
-        resolve(tokenSet.id_token);
+        resolve(tokenResponse.id_token);
       } catch (err) {
         res.end('Login failed: ' + err.message);
         server.close();
@@ -47,7 +51,7 @@ async function loginWithSso(backendUrl, tenantId) {
       }
     });
     server.listen(redirectPort, '127.0.0.1', () => {
-      shell.openExternal(authUrl);
+      shell.openExternal(authUrl.toString());
     });
   });
 

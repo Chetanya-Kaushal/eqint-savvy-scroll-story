@@ -1,6 +1,7 @@
 module.exports = {
   testDir: './tests',
-  timeout: 30000,
+  testMatch: ['tests/security/**/*.test.js', 'tests/e2e/**/*.test.js'],
+  timeout: 60000,
   retries: 0,
   reporter: 'list',
 };

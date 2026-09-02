@@ -1,14 +1,15 @@
 const { HCMDiscovery } = require('./hcm-discovery');
+const { makeBackendClient } = require('./backend-client');
 
 let settings = {
   ollamaUrl: 'http://localhost:11434',
   ollamaModel: 'phi3:mini',
-  oracleUrl: '',
-  oracleUser: '',
-  oraclePass: '',
+  backendUrl: '',
+  tenantId: '',
   alwaysOnTop: true,
 };
 
+let backendClient = null;
 let hcmDiscovery = null;
 let hcmData = null;
 let hcmApis = null;
@@ -17,14 +18,24 @@ let conversationHistory = [];
 let hcmModules = {};
 let isCollapsed = false;
 
+async function initBackendClient() {
+  const authState = await window.savvy.getAuthState();
+  backendClient = makeBackendClient({
+    backendUrl: settings.backendUrl,
+    getAuthState: () => window.savvy.getAuthState(),
+  });
+  return authState;
+}
+
 async function loadInitialState() {
   settings = await window.savvy.getSettings();
   const kb = await window.savvy.loadKnowledgeBase();
   hcmApis = kb.hcmApis;
   knowledgeBase = kb.knowledgeBase;
-  hcmData = await window.savvy.loadHcmData();
-  if (hcmData) hcmDiscovery = new HCMDiscovery(settings);
-  conversationHistory = await window.savvy.getConversationHistory();
+  if (settings.backendUrl) await initBackendClient();
+  try {
+    conversationHistory = await backendClient?.getConversationHistory() || [];
+  } catch { conversationHistory = []; }
   const collapsed = await window.savvy.getUiState('isCollapsed');
   if (collapsed) isCollapsed = true;
 }
@@ -157,52 +168,165 @@ async function detectVisionModel() {
 }
 
 // ── Smart HCM Data Fetcher ──
-async function callOracleApi(method, resourcePath, body = null) {
-  if (!settings.oracleUrl || !settings.oracleUser || !settings.oraclePass) {
-    return { error: 'Oracle credentials not configured. Please set your Oracle URL, username, and password in the Settings tab.' };
+async function autoFetchData(userMessage) {
+  const msg = userMessage.toLowerCase();
+
+  if (!backendClient) {
+    return '\n[ERROR] Not signed in. Please sign in with SSO in the Settings tab.';
+  }
+
+  const oracleKeywords = ['absence', 'leave', 'employee', 'worker', 'team', 'department', 'location', 'job', 'position', 'payroll', 'salary', 'pay', 'benefit', 'insurance', 'time card', 'timesheet', 'hours', 'clock', 'performance', 'review', 'goal', 'learning', 'course', 'training', 'checklist', 'task', 'hcm', 'oracle', 'grade', 'headcount', 'head count', 'hire', 'termination', 'transfer'];
+  const isOracleRelated = oracleKeywords.some(kw => msg.includes(kw));
+
+  if (!isOracleRelated) {
+    return '\n[INFO] I can only help with Oracle Fusion HCM questions. Please ask about absences, employees, departments, payroll, benefits, time cards, or other HCM topics.';
+  }
+
+  let personFilter = '';
+  const personMatch = msg.match(/(?:employee|worker|person|team member)\s+([a-zA-Z0-9\s]+?)(?:\s+in|\s+from|\s+with|\s+for|\s+show|\s+get|\s+list|\s*$)/i);
+  if (personMatch && personMatch[1]) {
+    personFilter = personMatch[1].trim();
   }
 
   try {
-    const url = settings.oracleUrl + '/hcmRestApi/resources/11.13.18.05' + resourcePath;
-    const auth = 'Basic ' + btoa(settings.oracleUser + ':' + settings.oraclePass);
-
-    const options = {
-      method: method,
-      headers: {
-        'Authorization': auth,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+    if (msg.includes('absence') || msg.includes('leave') || msg.includes('time off') || msg.includes('vacation') || msg.includes('sick')) {
+      const data = await backendClient.fetchPersonData('/absences?onlyData=true&limit=20');
+      if (data.items && data.items.length > 0) {
+        const lines = data.items.map((a, i) => `${i+1}. ${formatAbsence(a)}`);
+        return '\n[ORACLE DATA - ABSENCES]\n' + lines.join('\n');
       }
-    };
-
-    if (body && (method === 'POST' || method === 'PATCH' || method === 'PUT')) {
-      options.body = JSON.stringify(body);
+      return '\n[ORACLE DATA] No absence records found.';
     }
 
-    const resp = await fetch(url, options);
-    const data = await resp.json();
-
-    if (!resp.ok) {
-      return { error: `Oracle API error: ${data.title || resp.statusText || resp.status}` };
+    if (msg.includes('employee') || msg.includes('worker') || msg.includes('team') || msg.includes('person') || msg.includes('list') || msg.includes('number') || msg.includes('headcount') || msg.includes('hire')) {
+      const data = await backendClient.fetchPersonData('/workers?onlyData=true&limit=20');
+      if (data.items && data.items.length > 0) {
+        const lines = data.items.map((w, i) => `${i+1}. ${formatWorker(w)}`);
+        return '\n[ORACLE DATA - EMPLOYEES]\n' + lines.join('\n');
+      }
+      return '\n[ORACLE DATA] No employee records found.';
     }
 
-    return data;
+    if (msg.includes('department') || msg.includes('dept')) {
+      const data = await backendClient.fetchPersonData('/departments?onlyData=true&limit=20');
+      if (data.items && data.items.length > 0) {
+        const lines = data.items.map((d, i) => `${i+1}. ${formatDepartment(d)}`);
+        return '\n[ORACLE DATA - DEPARTMENTS]\n' + lines.join('\n');
+      }
+      return '\n[ORACLE DATA] No department records found.';
+    }
+
+    if (msg.includes('location') || msg.includes('office') || msg.includes('site')) {
+      const data = await backendClient.fetchPersonData('/locations?onlyData=true&limit=20');
+      if (data.items && data.items.length > 0) {
+        const lines = data.items.map((l, i) => `${i+1}. ${formatLocation(l)}`);
+        return '\n[ORACLE DATA - LOCATIONS]\n' + lines.join('\n');
+      }
+      return '\n[ORACLE DATA] No location records found.';
+    }
+
+    if (msg.includes('job') || msg.includes('role')) {
+      const data = await backendClient.fetchPersonData('/jobs?onlyData=true&limit=20');
+      if (data.items && data.items.length > 0) {
+        const lines = data.items.map((j, i) => `${i+1}. ${formatJob(j)}`);
+        return '\n[ORACLE DATA - JOBS]\n' + lines.join('\n');
+      }
+      return '\n[ORACLE DATA] No job records found.';
+    }
+
+    if (msg.includes('position')) {
+      const data = await backendClient.fetchPersonData('/positions?onlyData=true&limit=20');
+      if (data.items && data.items.length > 0) {
+        const lines = data.items.map((p, i) => `${i+1}. ${formatPosition(p)}`);
+        return '\n[ORACLE DATA - POSITIONS]\n' + lines.join('\n');
+      }
+      return '\n[ORACLE DATA] No position records found.';
+    }
+
+    if (msg.includes('grade') || msg.includes('salary band') || msg.includes('compensation')) {
+      const data = await backendClient.fetchPersonData('/grades?onlyData=true&limit=20');
+      if (data.items && data.items.length > 0) {
+        const lines = data.items.map((g, i) => `${i+1}. ${formatGrade(g)}`);
+        return '\n[ORACLE DATA - GRADES]\n' + lines.join('\n');
+      }
+      return '\n[ORACLE DATA] No grade records found.';
+    }
+
+    if (msg.includes('time card') || msg.includes('timesheet') || msg.includes('hours worked') || msg.includes('clock') || msg.includes('attendance')) {
+      const data = await backendClient.fetchPersonData('/timeCards?onlyData=true&limit=20');
+      if (data.items && data.items.length > 0) {
+        const lines = data.items.map((t, i) => `${i+1}. ${formatTimeCard(t)}`);
+        return '\n[ORACLE DATA - TIME CARDS]\n' + lines.join('\n');
+      }
+      return '\n[ORACLE DATA] No time card records found.';
+    }
+
+    if (msg.includes('payroll') || msg.includes('pay') || msg.includes('salary') || msg.includes('earning') || msg.includes('deduction')) {
+      const data = await backendClient.fetchPersonData('/payrollElements?onlyData=true&limit=20');
+      if (data.items && data.items.length > 0) {
+        const lines = data.items.map((p, i) => `${i+1}. ${formatPayroll(p)}`);
+        return '\n[ORACLE DATA - PAYROLL]\n' + lines.join('\n');
+      }
+      return '\n[ORACLE DATA] No payroll records found.';
+    }
+
+    if (msg.includes('benefit') || msg.includes('insurance') || msg.includes('401k') || msg.includes('enrollment')) {
+      const data = await backendClient.fetchPersonData('/benefitEnrollments?onlyData=true&limit=20');
+      if (data.items && data.items.length > 0) {
+        const lines = data.items.map((b, i) => `${i+1}. ${formatBenefit(b)}`);
+        return '\n[ORACLE DATA - BENEFITS]\n' + lines.join('\n');
+      }
+      return '\n[ORACLE DATA] No benefit records found.';
+    }
+
+    if (msg.includes('performance') || msg.includes('review') || msg.includes('evaluation')) {
+      const data = await backendClient.fetchPersonData('/performanceReviews?onlyData=true&limit=20');
+      if (data.items && data.items.length > 0) {
+        const lines = data.items.map((r, i) => `${i+1}. ${formatPerformanceReview(r)}`);
+        return '\n[ORACLE DATA - PERFORMANCE REVIEWS]\n' + lines.join('\n');
+      }
+      return '\n[ORACLE DATA] No performance review records found.';
+    }
+
+    if (msg.includes('goal') || msg.includes('objective') || msg.includes('target')) {
+      const data = await backendClient.fetchPersonData('/goals?onlyData=true&limit=20');
+      if (data.items && data.items.length > 0) {
+        const lines = data.items.map((g, i) => `${i+1}. ${formatGoal(g)}`);
+        return '\n[ORACLE DATA - GOALS]\n' + lines.join('\n');
+      }
+      return '\n[ORACLE DATA] No goal records found.';
+    }
+
+    if (msg.includes('course') || msg.includes('training') || msg.includes('learning')) {
+      const data = await backendClient.fetchPersonData('/learningCourses?onlyData=true&limit=20');
+      if (data.items && data.items.length > 0) {
+        const lines = data.items.map((c, i) => `${i+1}. ${formatCourse(c)}`);
+        return '\n[ORACLE DATA - LEARNING COURSES]\n' + lines.join('\n');
+      }
+      return '\n[ORACLE DATA] No learning course records found.';
+    }
+
+    if (msg.includes('enrollment') && (msg.includes('learning') || msg.includes('course') || msg.includes('training'))) {
+      const data = await backendClient.fetchPersonData('/learningEnrollments?onlyData=true&limit=20');
+      if (data.items && data.items.length > 0) {
+        const lines = data.items.map((e, i) => `${i+1}. ${formatLearningEnrollment(e)}`);
+        return '\n[ORACLE DATA - LEARNING ENROLLMENTS]\n' + lines.join('\n');
+      }
+      return '\n[ORACLE DATA] No learning enrollment records found.';
+    }
+
+    if (msg.includes('checklist') || msg.includes('task') || msg.includes('onboarding')) {
+      const data = await backendClient.fetchPersonData('/allocatedChecklists?onlyData=true&limit=20');
+      if (data.items && data.items.length > 0) {
+        const lines = data.items.map((c, i) => `${i+1}. ${formatChecklist(c)}`);
+        return '\n[ORACLE DATA - CHECKLISTS]\n' + lines.join('\n');
+      }
+      return '\n[ORACLE DATA] No checklist records found.';
+    }
   } catch (err) {
-    return { error: 'Failed to connect to Oracle: ' + err.message };
+    return '\n[ERROR] ' + err.message;
   }
-}
 
-// Fetch workers to get personId if needed
-async function getWorkerBySearch(searchTerm) {
-  const data = await callOracleApi('GET', `/workers?q=DisplayName='${searchTerm}'&onlyData=true&limit=5`);
-  if (data.items && data.items.length > 0) {
-    return data.items[0];
-  }
-  // Try by PersonNumber
-  const data2 = await callOracleApi('GET', `/workers?q=PersonNumber='${searchTerm}'&onlyData=true&limit=5`);
-  if (data2.items && data2.items.length > 0) {
-    return data2.items[0];
-  }
   return null;
 }
 
@@ -386,264 +510,6 @@ function formatChecklist(c) {
   ].filter(x => !x.endsWith('N/A')).join(' | ');
 }
 
-// ── Main Auto-Fetch Function ──
-async function autoFetchData(userMessage) {
-  const msg = userMessage.toLowerCase();
-
-  // Check if Oracle is configured
-  if (!settings.oracleUrl || !settings.oracleUser || !settings.oraclePass) {
-    return '\n[ERROR] Oracle credentials not configured. Please set your Oracle URL, username, and password in the Settings tab.';
-  }
-
-  // Check if question is related to Oracle HCM
-  const oracleKeywords = ['absence', 'leave', 'employee', 'worker', 'team', 'department', 'location', 'job', 'position', 'payroll', 'salary', 'pay', 'benefit', 'insurance', 'time card', 'timesheet', 'hours', 'clock', 'performance', 'review', 'goal', 'learning', 'course', 'training', 'checklist', 'task', 'hcm', 'oracle', 'grade', 'headcount', 'head count', 'hire', 'termination', 'transfer'];
-  const isOracleRelated = oracleKeywords.some(kw => msg.includes(kw));
-
-  if (!isOracleRelated) {
-    return '\n[INFO] I can only help with Oracle Fusion HCM questions. Please ask about absences, employees, departments, payroll, benefits, time cards, or other HCM topics.';
-  }
-
-  // Extract person name/number if mentioned
-  let personFilter = '';
-  const personMatch = msg.match(/(?:employee|worker|person|team member)\s+([a-zA-Z0-9\s]+?)(?:\s+in|\s+from|\s+with|\s+for|\s+show|\s+get|\s+list|\s*$)/i);
-  if (personMatch && personMatch[1]) {
-    personFilter = personMatch[1].trim();
-  }
-
-  // ABSENCES
-  if (msg.includes('absence') || msg.includes('leave') || msg.includes('time off') || msg.includes('vacation') || msg.includes('sick')) {
-    let endpoint = '/absences?onlyData=true&limit=20';
-    if (personFilter) {
-      const worker = await getWorkerBySearch(personFilter);
-      if (worker) {
-        endpoint += `&q=PersonId=${worker.PersonId}`;
-      }
-    }
-    const data = await callOracleApi('GET', endpoint);
-    if (data.error) return '\n[ERROR] ' + data.error;
-    if (data.items && data.items.length > 0) {
-      const lines = data.items.map((a, i) => `${i+1}. ${formatAbsence(a)}`);
-      return '\n[ORACLE DATA - ABSENCES]\n' + lines.join('\n');
-    }
-    return '\n[ORACLE DATA] No absence records found.';
-  }
-
-  // EMPLOYEES/WORKERS
-  if (msg.includes('employee') || msg.includes('worker') || msg.includes('team') || msg.includes('person') || msg.includes('list') || msg.includes('number') || msg.includes('headcount') || msg.includes('hire')) {
-    let endpoint = '/workers?onlyData=true&limit=20';
-    if (personFilter) {
-      endpoint += `&q=DisplayName='${personFilter}'`;
-    }
-    const data = await callOracleApi('GET', endpoint);
-    if (data.error) return '\n[ERROR] ' + data.error;
-    if (data.items && data.items.length > 0) {
-      const lines = data.items.map((w, i) => `${i+1}. ${formatWorker(w)}`);
-      return '\n[ORACLE DATA - EMPLOYEES]\n' + lines.join('\n');
-    }
-    return '\n[ORACLE DATA] No employee records found.';
-  }
-
-  // DEPARTMENTS
-  if (msg.includes('department') || msg.includes('dept')) {
-    let endpoint = '/departments?onlyData=true&limit=20';
-    const data = await callOracleApi('GET', endpoint);
-    if (data.error) return '\n[ERROR] ' + data.error;
-    if (data.items && data.items.length > 0) {
-      const lines = data.items.map((d, i) => `${i+1}. ${formatDepartment(d)}`);
-      return '\n[ORACLE DATA - DEPARTMENTS]\n' + lines.join('\n');
-    }
-    return '\n[ORACLE DATA] No department records found.';
-  }
-
-  // LOCATIONS
-  if (msg.includes('location') || msg.includes('office') || msg.includes('site')) {
-    let endpoint = '/locations?onlyData=true&limit=20';
-    const data = await callOracleApi('GET', endpoint);
-    if (data.error) return '\n[ERROR] ' + data.error;
-    if (data.items && data.items.length > 0) {
-      const lines = data.items.map((l, i) => `${i+1}. ${formatLocation(l)}`);
-      return '\n[ORACLE DATA - LOCATIONS]\n' + lines.join('\n');
-    }
-    return '\n[ORACLE DATA] No location records found.';
-  }
-
-  // JOBS
-  if (msg.includes('job') || msg.includes('role')) {
-    let endpoint = '/jobs?onlyData=true&limit=20';
-    const data = await callOracleApi('GET', endpoint);
-    if (data.error) return '\n[ERROR] ' + data.error;
-    if (data.items && data.items.length > 0) {
-      const lines = data.items.map((j, i) => `${i+1}. ${formatJob(j)}`);
-      return '\n[ORACLE DATA - JOBS]\n' + lines.join('\n');
-    }
-    return '\n[ORACLE DATA] No job records found.';
-  }
-
-  // POSITIONS
-  if (msg.includes('position')) {
-    let endpoint = '/positions?onlyData=true&limit=20';
-    const data = await callOracleApi('GET', endpoint);
-    if (data.error) return '\n[ERROR] ' + data.error;
-    if (data.items && data.items.length > 0) {
-      const lines = data.items.map((p, i) => `${i+1}. ${formatPosition(p)}`);
-      return '\n[ORACLE DATA - POSITIONS]\n' + lines.join('\n');
-    }
-    return '\n[ORACLE DATA] No position records found.';
-  }
-
-  // GRADES
-  if (msg.includes('grade') || msg.includes('salary band') || msg.includes('compensation')) {
-    let endpoint = '/grades?onlyData=true&limit=20';
-    const data = await callOracleApi('GET', endpoint);
-    if (data.error) return '\n[ERROR] ' + data.error;
-    if (data.items && data.items.length > 0) {
-      const lines = data.items.map((g, i) => `${i+1}. ${formatGrade(g)}`);
-      return '\n[ORACLE DATA - GRADES]\n' + lines.join('\n');
-    }
-    return '\n[ORACLE DATA] No grade records found.';
-  }
-
-  // TIME CARDS
-  if (msg.includes('time card') || msg.includes('timesheet') || msg.includes('hours worked') || msg.includes('clock') || msg.includes('attendance')) {
-    let endpoint = '/timeCards?onlyData=true&limit=20';
-    if (personFilter) {
-      const worker = await getWorkerBySearch(personFilter);
-      if (worker) {
-        endpoint += `&q=PersonId=${worker.PersonId}`;
-      }
-    }
-    const data = await callOracleApi('GET', endpoint);
-    if (data.error) return '\n[ERROR] ' + data.error;
-    if (data.items && data.items.length > 0) {
-      const lines = data.items.map((t, i) => `${i+1}. ${formatTimeCard(t)}`);
-      return '\n[ORACLE DATA - TIME CARDS]\n' + lines.join('\n');
-    }
-    return '\n[ORACLE DATA] No time card records found.';
-  }
-
-  // PAYROLL
-  if (msg.includes('payroll') || msg.includes('pay') || msg.includes('salary') || msg.includes('earning') || msg.includes('deduction')) {
-    let endpoint = '/payrollElements?onlyData=true&limit=20';
-    if (personFilter) {
-      const worker = await getWorkerBySearch(personFilter);
-      if (worker) {
-        endpoint += `&q=PersonId=${worker.PersonId}`;
-      }
-    }
-    const data = await callOracleApi('GET', endpoint);
-    if (data.error) return '\n[ERROR] ' + data.error;
-    if (data.items && data.items.length > 0) {
-      const lines = data.items.map((p, i) => `${i+1}. ${formatPayroll(p)}`);
-      return '\n[ORACLE DATA - PAYROLL]\n' + lines.join('\n');
-    }
-    return '\n[ORACLE DATA] No payroll records found.';
-  }
-
-  // BENEFITS
-  if (msg.includes('benefit') || msg.includes('insurance') || msg.includes('401k') || msg.includes('enrollment')) {
-    let endpoint = '/benefitEnrollments?onlyData=true&limit=20';
-    if (personFilter) {
-      const worker = await getWorkerBySearch(personFilter);
-      if (worker) {
-        endpoint += `&q=PersonId=${worker.PersonId}`;
-      }
-    }
-    const data = await callOracleApi('GET', endpoint);
-    if (data.error) return '\n[ERROR] ' + data.error;
-    if (data.items && data.items.length > 0) {
-      const lines = data.items.map((b, i) => `${i+1}. ${formatBenefit(b)}`);
-      return '\n[ORACLE DATA - BENEFITS]\n' + lines.join('\n');
-    }
-    return '\n[ORACLE DATA] No benefit records found.';
-  }
-
-  // PERFORMANCE REVIEWS
-  if (msg.includes('performance') || msg.includes('review') || msg.includes('evaluation')) {
-    let endpoint = '/performanceReviews?onlyData=true&limit=20';
-    if (personFilter) {
-      const worker = await getWorkerBySearch(personFilter);
-      if (worker) {
-        endpoint += `&q=PersonId=${worker.PersonId}`;
-      }
-    }
-    const data = await callOracleApi('GET', endpoint);
-    if (data.error) return '\n[ERROR] ' + data.error;
-    if (data.items && data.items.length > 0) {
-      const lines = data.items.map((r, i) => `${i+1}. ${formatPerformanceReview(r)}`);
-      return '\n[ORACLE DATA - PERFORMANCE REVIEWS]\n' + lines.join('\n');
-    }
-    return '\n[ORACLE DATA] No performance review records found.';
-  }
-
-  // GOALS
-  if (msg.includes('goal') || msg.includes('objective') || msg.includes('target')) {
-    let endpoint = '/goals?onlyData=true&limit=20';
-    if (personFilter) {
-      const worker = await getWorkerBySearch(personFilter);
-      if (worker) {
-        endpoint += `&q=PersonId=${worker.PersonId}`;
-      }
-    }
-    const data = await callOracleApi('GET', endpoint);
-    if (data.error) return '\n[ERROR] ' + data.error;
-    if (data.items && data.items.length > 0) {
-      const lines = data.items.map((g, i) => `${i+1}. ${formatGoal(g)}`);
-      return '\n[ORACLE DATA - GOALS]\n' + lines.join('\n');
-    }
-    return '\n[ORACLE DATA] No goal records found.';
-  }
-
-  // LEARNING COURSES
-  if (msg.includes('course') || msg.includes('training') || msg.includes('learning')) {
-    let endpoint = '/learningCourses?onlyData=true&limit=20';
-    const data = await callOracleApi('GET', endpoint);
-    if (data.error) return '\n[ERROR] ' + data.error;
-    if (data.items && data.items.length > 0) {
-      const lines = data.items.map((c, i) => `${i+1}. ${formatCourse(c)}`);
-      return '\n[ORACLE DATA - LEARNING COURSES]\n' + lines.join('\n');
-    }
-    return '\n[ORACLE DATA] No learning course records found.';
-  }
-
-  // LEARNING ENROLLMENTS
-  if (msg.includes('enrollment') && (msg.includes('learning') || msg.includes('course') || msg.includes('training'))) {
-    let endpoint = '/learningEnrollments?onlyData=true&limit=20';
-    if (personFilter) {
-      const worker = await getWorkerBySearch(personFilter);
-      if (worker) {
-        endpoint += `&q=PersonId=${worker.PersonId}`;
-      }
-    }
-    const data = await callOracleApi('GET', endpoint);
-    if (data.error) return '\n[ERROR] ' + data.error;
-    if (data.items && data.items.length > 0) {
-      const lines = data.items.map((e, i) => `${i+1}. ${formatLearningEnrollment(e)}`);
-      return '\n[ORACLE DATA - LEARNING ENROLLMENTS]\n' + lines.join('\n');
-    }
-    return '\n[ORACLE DATA] No learning enrollment records found.';
-  }
-
-  // CHECKLISTS
-  if (msg.includes('checklist') || msg.includes('task') || msg.includes('onboarding')) {
-    let endpoint = '/allocatedChecklists?onlyData=true&limit=20';
-    if (personFilter) {
-      const worker = await getWorkerBySearch(personFilter);
-      if (worker) {
-        endpoint += `&q=PersonId=${worker.PersonId}`;
-      }
-    }
-    const data = await callOracleApi('GET', endpoint);
-    if (data.error) return '\n[ERROR] ' + data.error;
-    if (data.items && data.items.length > 0) {
-      const lines = data.items.map((c, i) => `${i+1}. ${formatChecklist(c)}`);
-      return '\n[ORACLE DATA - CHECKLISTS]\n' + lines.join('\n');
-    }
-    return '\n[ORACLE DATA] No checklist records found.';
-  }
-
-  return null;
-}
-
 // ── Chat ──
 let pageContext = '';
 
@@ -715,7 +581,9 @@ CRITICAL RULES:
   // Save to conversation history
   conversationHistory.push({ role: 'user', content: msg, timestamp: Date.now() });
   conversationHistory.push({ role: 'bot', content: fullText || reply, timestamp: Date.now() });
-  await window.savvy.saveConversationHistory(conversationHistory);
+  if (backendClient) {
+    try { await backendClient.saveConversationHistory(conversationHistory); } catch {}
+  }
 }
 
 // ── Understand (HCM Discovery) ──
@@ -725,63 +593,59 @@ async function runDiscovery() {
   const statusDiv = document.getElementById('understand-status');
   const summaryDiv = document.getElementById('understand-summary');
 
-  if (!settings.oracleUrl || !settings.oracleUser || !settings.oraclePass) {
+  if (!backendClient) {
     statusDiv.style.display = 'block';
     statusDiv.style.background = '#fef2f2';
     statusDiv.style.border = '1px solid #fecaca';
     statusDiv.style.color = '#991b1b';
-    statusDiv.textContent = 'Oracle URL, username, and password required. Set them in the Settings above.';
+    statusDiv.textContent = 'Not signed in. Please sign in with SSO in the Settings tab.';
     return;
   }
 
   btn.disabled = true;
-  btn.textContent = 'Discovering...';
+  btn.textContent = 'Loading...';
   progressDiv.style.display = 'block';
   progressDiv.innerHTML = '';
   statusDiv.style.display = 'none';
   summaryDiv.style.display = 'none';
 
-  hcmDiscovery = new HCMDiscovery(settings);
-
-  hcmDiscovery.onProgress = (msg, status) => {
-    const line = document.createElement('div');
-    const icon = status === 'done' ? '\u2713' : status === 'error' ? '\u2717' : '\u25CB';
-    const color = status === 'done' ? '#166534' : status === 'error' ? '#991b1b' : '#64748b';
-    line.style.cssText = `font-size:11px;color:${color};padding:2px 0;`;
-    line.textContent = `${icon} ${msg}`;
-    progressDiv.appendChild(line);
-    progressDiv.scrollTop = progressDiv.scrollHeight;
-  };
+  const categories = ['department', 'location', 'job', 'position', 'grade'];
+  let totalRecords = 0;
 
   try {
-    const data = await hcmDiscovery.runAll();
-    hcmData = data;
+    for (const cat of categories) {
+      const line = document.createElement('div');
+      line.style.cssText = 'font-size:11px;color:#64748b;padding:2px 0;';
+      line.textContent = `\u25CB Fetching ${cat}...`;
+      progressDiv.appendChild(line);
 
-    await window.savvy.saveHcmData(data);
-
-    const summary = hcmDiscovery.buildSummary();
-    const totalRecords = Object.values(data).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+      try {
+        const records = await backendClient.fetchReferenceData(cat);
+        totalRecords += records.length;
+        line.textContent = `\u2713 ${cat}: ${records.length} records`;
+        line.style.color = '#166534';
+      } catch (err) {
+        line.textContent = `\u2717 ${cat}: ${err.message}`;
+        line.style.color = '#991b1b';
+      }
+      progressDiv.scrollTop = progressDiv.scrollHeight;
+    }
 
     statusDiv.style.display = 'block';
     statusDiv.style.background = '#f0fdf4';
     statusDiv.style.border = '1px solid #bbf7d0';
     statusDiv.style.color = '#166534';
-    statusDiv.textContent = `Discovery complete! ${totalRecords} records across ${Object.keys(data).length} modules.`;
-
-    if (summary) {
-      summaryDiv.style.display = 'block';
-      summaryDiv.textContent = summary;
-    }
+    statusDiv.textContent = `Loaded! ${totalRecords} reference records from backend.`;
   } catch (err) {
     statusDiv.style.display = 'block';
     statusDiv.style.background = '#fef2f2';
     statusDiv.style.border = '1px solid #fecaca';
     statusDiv.style.color = '#991b1b';
-    statusDiv.textContent = 'Discovery failed: ' + err.message;
+    statusDiv.textContent = 'Load failed: ' + err.message;
   }
 
   btn.disabled = false;
-  btn.textContent = 'Discover My HCM System';
+  btn.textContent = 'Load Reference Data';
 }
 
 // ── Read Page (Vision) ──
@@ -1073,11 +937,9 @@ async function expandFromBubble() {
 async function loadSettings() {
   document.getElementById('setOllamaUrl').value = settings.ollamaUrl || '';
   document.getElementById('setOllamaModel').value = settings.ollamaModel || '';
-  document.getElementById('setOracleUrl').value = settings.oracleUrl || '';
-  document.getElementById('setOracleUser').value = settings.oracleUser || '';
-  document.getElementById('setOraclePass').value = settings.oraclePass || '';
+  document.getElementById('setBackendUrl').value = settings.backendUrl || '';
+  document.getElementById('setTenantId').value = settings.tenantId || '';
 
-  // Update status display
   const statusEl = document.getElementById('status');
   if (statusEl) {
     if (settings.ollamaUrl) {
@@ -1089,7 +951,6 @@ async function loadSettings() {
     }
   }
 
-  // Restore collapsed state
   const wasCollapsed = await window.savvy.getUiState('isCollapsed');
   if (wasCollapsed) {
     const app = document.getElementById('app');
@@ -1097,7 +958,6 @@ async function loadSettings() {
     app.style.display = 'none';
     bubbleOverlay.style.display = 'block';
     isCollapsed = true;
-    // Move to corner on startup
     await window.savvy.moveOverlayToCorner();
   }
 }
@@ -1205,9 +1065,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const newSettings = {
       ollamaUrl: document.getElementById('setOllamaUrl').value,
       ollamaModel: document.getElementById('setOllamaModel').value,
-      oracleUrl: document.getElementById('setOracleUrl').value,
-      oracleUser: document.getElementById('setOracleUser').value,
-      oraclePass: document.getElementById('setOraclePass').value,
+      backendUrl: document.getElementById('setBackendUrl').value,
+      tenantId: document.getElementById('setTenantId').value,
     };
     settings = { ...settings, ...newSettings };
     await window.savvy.setSettings(settings);
@@ -1216,10 +1075,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     status.textContent = 'Settings saved!';
     status.style.display = 'block';
     setTimeout(() => { status.style.display = 'none'; }, 2000);
+  });
 
-    // Refresh discovery with new settings if data exists
-    if (newSettings.oracleUrl && newSettings.oracleUser) {
-      hcmDiscovery = new HCMDiscovery(settings);
+  // SSO Login
+  document.getElementById('ssoLoginBtn').addEventListener('click', async () => {
+    const tenantId = document.getElementById('setTenantId').value;
+    const backendUrl = document.getElementById('setBackendUrl').value;
+    settings = { ...settings, tenantId, backendUrl };
+    await window.savvy.setSettings(settings);
+    const statusEl = document.getElementById('ssoStatus');
+    statusEl.style.display = 'block';
+    try {
+      await window.savvy.loginWithSso(backendUrl, tenantId);
+      await initBackendClient();
+      statusEl.textContent = 'Signed in!';
+      statusEl.style.color = '#166534';
+    } catch (err) {
+      statusEl.textContent = 'Sign-in failed: ' + err.message;
+      statusEl.style.color = '#991b1b';
     }
   });
 
