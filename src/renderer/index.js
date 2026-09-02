@@ -641,7 +641,8 @@ CRITICAL RULES:
           const llmText = result.text.split('\n').filter(l => !l.startsWith('__HTML__')).join('\n');
           const botMsg = addMessage('', 'bot');
           const sysPrompt2 = 'You are Savvy, an Oracle Fusion HCM assistant. Use the full data provided to answer. Always show person names, never raw IDs. Be brief.';
-          const reply = await callLLM([{ role: 'system', content: sysPrompt2 }, { role: 'user', content: llmText }], (chunk) => {
+          const recentHist2 = conversationHistory.slice(-10).map(h => ({ role: h.role === 'bot' ? 'assistant' : 'user', content: h.content }));
+          const reply = await callLLM([{ role: 'system', content: sysPrompt2 }, ...recentHist2, { role: 'user', content: llmText }], (chunk) => {
             botMsg.querySelector('.msg-text').innerHTML = formatMarkdown(fullText);
             document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
           });
@@ -711,8 +712,14 @@ CRITICAL RULES:
     fullMsg = '[HCM KNOWLEDGE]\n' + kb + '\n\n' + fullMsg;
   }
 
+  // Build messages with conversation history for context
+  const recentHistory = conversationHistory.slice(-20).map(h => ({
+    role: h.role === 'bot' ? 'assistant' : 'user',
+    content: h.content,
+  }));
   const messages = [
     { role: 'system', content: sysPrompt },
+    ...recentHistory,
     { role: 'user', content: fullMsg }
   ];
 
