@@ -38,17 +38,27 @@ function createOverlay() {
   const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
   const settings = store.get('settings');
 
+  // Default position: centered vertically, offset slightly right
+  const savedX = store.get('overlayX');
+  const savedY = store.get('overlayY');
+  const defaultW = 420;
+  const defaultH = 750;
+  const posX = savedX !== null ? savedX : Math.round((screenW - defaultW) / 2) + 60;
+  const posY = savedY !== null ? savedY : Math.round((screenH - defaultH) / 2);
+
   overlayWindow = new BrowserWindow({
-    width: store.get('overlayWidth'),
-    height: store.get('overlayHeight'),
-    x: store.get('overlayX') || screenW - 420,
-    y: store.get('overlayY') || 100,
+    width: store.get('overlayWidth') || defaultW,
+    height: store.get('overlayHeight') || defaultH,
+    x: posX,
+    y: posY,
     frame: false,
     transparent: true,
     alwaysOnTop: settings.alwaysOnTop,
     resizable: true,
     skipTaskbar: true,
     hasShadow: false,
+    minWidth: 360,
+    minHeight: 500,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
