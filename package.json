@@ -6,7 +6,8 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win",
-    "build:portable": "electron-builder --win portable"
+    "build:portable": "electron-builder --win portable",
+    "test:e2e": "playwright test tests/"
   },
   "author": "EQInt",
   "license": "MIT",
@@ -14,8 +15,10 @@
     "electron-store": "^8.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "electron": "^30.0.0",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.9.1",
+    "playwright": "^1.62.1"
   },
   "build": {
     "appId": "com.eqint.savvy-desktop",
