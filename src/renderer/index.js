@@ -1,5 +1,5 @@
 const { classifyOracleError } = require('./access-control');
-const { detectPersonNumber } = require('./person-query-parser');
+const { detectPersonNumber, detectSelfReference } = require('./person-query-parser');
 const { WORKERS_EXPAND, todayDate, flattenWorkerItem } = require('./worker-profile');
 
 let settings = {
@@ -258,7 +258,7 @@ async function autoFetchData(userMessage) {
   // explicit person number/name was already found above — an explicit reference in
   // the message always wins over generic conversational phrasing like "show me...",
   // which is not actually a self-reference just because it contains the word "me".
-  const isMyQuery = !personNumber && !personName && /\bmy\b|\bme\b|\bmine\b|\bmyself\b/i.test(userMessage);
+  const isMyQuery = !personNumber && !personName && detectSelfReference(userMessage);
   if (isMyQuery && currentUserPersonNumber) {
     return await fetchDataForPerson({
       personNumber: currentUserPersonNumber,
@@ -400,7 +400,12 @@ async function fetchDataForPerson(person, endpoints) {
             results.push(`  ${i + 1}. ${JSON.stringify(clean)}`);
           });
         }
-        results.push(`__HTML__${label}__${ep.path}__${items.length}__${JSON.stringify(items)}`);
+        // hasMore means Oracle has more records beyond this page — carry the exact
+        // next-page URL (offset advanced by what we already have) so a "Load more"
+        // button can fetch it on demand instead of blocking here to fetch everything
+        // up front, which risks a very long wait for large/unfiltered result sets.
+        const nextUrl = result.data?.hasMore ? `${url}&offset=${items.length}` : null;
+        results.push(`__HTML__${label}__${ep.path}__${items.length}__${JSON.stringify({ items, nextUrl })}`);
       } else {
         results.push(`[ORACLE DATA — ${label}] No records found.`);
       }
@@ -533,11 +538,11 @@ function buildPersonProfileHTML(item) {
 // Shows a friendly one-person profile card when exactly one Workers record is
 // being displayed, and the plain numbered list for everything else (multi-record
 // lists, other endpoint types).
-function renderDataBlock(epName, epPath, items) {
+function renderDataBlock(epName, epPath, items, nextUrl) {
   if (epPath === '/workers' && items.length === 1) {
     return buildPersonProfileHTML(items[0]);
   }
-  return buildFormattedList(epName, epPath, items);
+  return buildFormattedList(epName, epPath, items, 10, false, nextUrl);
 }
 
 const HTML_FORMATTERS = {
@@ -612,37 +617,42 @@ const SUGGESTIONS = {
   '/documentRecords': 'You can ask about specific document types or delivery preferences.',
 };
 
-function buildFormattedList(epName, epPath, items, maxShow = 10, isTypeList = false) {
+function loadMoreButtonHTML(nextUrl, epPath, epName) {
+  if (!nextUrl) return '';
+  return `<button class="load-more-btn read-btn" data-next-url="${escapeHtml(nextUrl)}" data-ep-path="${escapeHtml(epPath)}" data-ep-name="${escapeHtml(epName)}" style="width:100%;margin-top:6px;font-size:11px;padding:6px;">Load more</button>`;
+}
+
+// Shows every record actually fetched in this page (no display-level truncation
+// beyond what was already paid for in the round trip) plus a real "Load more" button
+// when Oracle reported more records exist beyond this page (nextUrl) - clicking it
+// fetches the next page on demand rather than blocking here to fetch everything
+// up front.
+function buildFormattedList(epName, epPath, items, maxShow = 10, isTypeList = false, nextUrl = null) {
   const total = items.length;
-  const showing = Math.min(total, maxShow);
 
   // Type lists: show as simple bullet list, not numbered rows
   if (isTypeList) {
     let html = `<div class="data-section"><div class="data-header"><span class="data-icon">&#9679;</span> <b>${escapeHtml(epName)}</b> — ${total} available</div>`;
     html += '<div style="padding:4px 8px;">';
-    for (let i = 0; i < showing; i++) {
+    for (let i = 0; i < total; i++) {
       const name = items[i].AbsenceTypeName || items[i].absenceTypeName || items[i].Name || items[i].name || `${epName.replace(/s$/, '')} type`;
       html += `<div style="padding:3px 0;font-size:12px;">&#8226; <b>${escapeHtml(name)}</b></div>`;
     }
-    if (total > maxShow) {
-      html += `<div class="data-more">${total - maxShow} more types not shown.</div>`;
-    }
     const hint = SUGGESTIONS[epPath];
     if (hint) html += `<div class="data-more" style="color:#818cf8;margin-top:4px;">${escapeHtml(hint)}</div>`;
+    html += loadMoreButtonHTML(nextUrl, epPath, epName);
     html += '</div></div>';
     return html;
   }
 
   // Regular records: show as numbered rows
-  let html = `<div class="data-section"><div class="data-header"><span class="data-icon">&#9679;</span> <b>${escapeHtml(epName)}</b> — ${total} record${total !== 1 ? 's' : ''}</div>`;
-  for (let i = 0; i < showing; i++) {
+  let html = `<div class="data-section"><div class="data-header"><span class="data-icon">&#9679;</span> <b>${escapeHtml(epName)}</b> — ${total} record${total !== 1 ? 's' : ''}${nextUrl ? '+' : ''}</div>`;
+  for (let i = 0; i < total; i++) {
     html += formatItemAsHTML(epPath, items[i], i + 1, epName);
-  }
-  if (total > maxShow) {
-    html += `<div class="data-more">${total - maxShow} more records not shown. Ask me to "show all ${epName.toLowerCase()}" to see the full list.</div>`;
   }
   const hint = SUGGESTIONS[epPath];
   if (hint) html += `<div class="data-more" style="color:#818cf8;margin-top:4px;">${escapeHtml(hint)}</div>`;
+  html += loadMoreButtonHTML(nextUrl, epPath, epName);
   html += '</div>';
   return html;
 }
@@ -730,8 +740,8 @@ CRITICAL RULES:
           for (const line of htmlLines) {
             const parts = line.split('__');
             try {
-              const items = JSON.parse(parts.slice(5).join('__'));
-              html += renderDataBlock(parts[2], parts[3], items);
+              const payload = JSON.parse(parts.slice(5).join('__'));
+              html += renderDataBlock(parts[2], parts[3], payload.items, payload.nextUrl);
             } catch {}
           }
           // Show the real fetched data card only — no LLM prose on top of it, for the
@@ -787,8 +797,8 @@ CRITICAL RULES:
     for (const line of htmlLines) {
       const parts = line.split('__');
       try {
-        const items = JSON.parse(parts.slice(5).join('__'));
-        htmlSections += renderDataBlock(parts[2], parts[3], items);
+        const payload = JSON.parse(parts.slice(5).join('__'));
+        htmlSections += renderDataBlock(parts[2], parts[3], payload.items, payload.nextUrl);
       } catch {}
     }
     const llmData = fetchedData.text.split('\n').filter(l => !l.startsWith('__HTML__')).join('\n');
@@ -1400,9 +1410,54 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Enter') sendMessage();
   });
 
-  // Clear chat
-  document.getElementById('clearChatBtn').addEventListener('click', () => {
+  // "Load more" — delegated on #messages since cards (and their buttons) are added
+  // dynamically after every chat response. Fetches the next page on demand instead of
+  // blocking the original response to fetch everything up front, which risks a very
+  // long wait for large or unfiltered result sets.
+  document.getElementById('messages').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.load-more-btn');
+    if (!btn) return;
+    const nextUrl = btn.dataset.nextUrl;
+    const epPath = btn.dataset.epPath;
+    const epName = btn.dataset.epName;
+    btn.disabled = true;
+    btn.textContent = 'Loading...';
+    try {
+      const result = await window.savvy.oracleApi(nextUrl, settings.oracleUser, settings.oraclePass);
+      if (!result.ok) {
+        btn.textContent = 'Failed to load more';
+        return;
+      }
+      const rawItems = result.data?.items || [];
+      const items = epPath === '/workers' ? rawItems.map(flattenWorkerItem) : rawItems;
+      const existingRowCount = btn.parentElement.querySelectorAll('.data-row').length;
+      items.forEach((item, i) => {
+        btn.insertAdjacentHTML('beforebegin', formatItemAsHTML(epPath, item, existingRowCount + i + 1, epName));
+      });
+      if (result.data?.hasMore && items.length > 0) {
+        const urlObj = new URL(nextUrl);
+        const currentOffset = parseInt(urlObj.searchParams.get('offset') || '0', 10);
+        urlObj.searchParams.set('offset', String(currentOffset + items.length));
+        btn.dataset.nextUrl = urlObj.toString();
+        btn.disabled = false;
+        btn.textContent = 'Load more';
+      } else {
+        btn.remove();
+      }
+    } catch (err) {
+      btn.textContent = 'Failed to load more';
+      console.error('[Renderer] Load more failed:', err.message);
+    }
+  });
+
+  // Clear chat - must reset the in-memory conversationHistory AND persist the empty
+  // state, not just wipe the visible DOM. Otherwise the "cleared" messages still feed
+  // the LLM as context on the next message, and reappear on the next app launch since
+  // loadInitialState() reloads conversationHistory from the store and replays it.
+  document.getElementById('clearChatBtn').addEventListener('click', async () => {
     document.getElementById('messages').innerHTML = '';
+    conversationHistory = [];
+    try { await window.savvy.saveConversationHistory(conversationHistory); } catch {}
     addMessage('Chat cleared. Ask me anything about Oracle HCM.', 'bot');
   });
 

@@ -17,4 +17,15 @@ function detectPersonNumber(message) {
   return null;
 }
 
-module.exports = { detectPersonNumber };
+// Detects whether a message is genuinely a self-reference ("my absences", "mine",
+// "myself", "absences for me") versus just containing the word "me" as the object of
+// a request verb ("show me...", "tell me...", "give me...", "get me...", "find me...")
+// which is not a self-reference at all - it's ordinary imperative phrasing that could
+// be about anyone or anything.
+function detectSelfReference(message) {
+  if (/\bmy\b|\bmine\b|\bmyself\b/i.test(message)) return true;
+  const withoutRequestVerbMe = message.replace(/\b(show|tell|give|get|find|fetch|pull up)\s+me\b/gi, '$1');
+  return /\bme\b/i.test(withoutRequestVerbMe);
+}
+
+module.exports = { detectPersonNumber, detectSelfReference };
