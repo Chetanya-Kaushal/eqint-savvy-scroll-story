@@ -41,38 +41,28 @@ class HCMDiscovery {
     let lastError;
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        const resp = await fetch(url.toString(), {
-          method: 'GET',
-          headers: this._headers(),
-          signal: AbortSignal.timeout(30000), // 30 second timeout
-        });
+        const result = await window.savvy.oracleApi(url.toString(), this.username, this.password);
 
-        if (resp.status === 401) {
-          throw new Error('Authentication failed. Check your Oracle username and password.');
-        }
-        
-        if (resp.status === 403) {
-          throw new Error('Access denied. Your account may not have permission to access this resource.');
-        }
-        
-        if (resp.status === 404) {
-          throw new Error('Resource not found. This endpoint may not be available in your Oracle version.');
-        }
-
-        if (resp.status === 429) {
-          // Rate limited - wait and retry
-          const waitTime = Math.pow(2, attempt) * 1000;
-          this._log(`Rate limited, waiting ${waitTime/1000}s before retry...`, 'loading');
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-          continue;
+        if (!result.ok) {
+          if (result.status === 401) {
+            throw new Error('Authentication failed. Check your Oracle username and password.');
+          }
+          if (result.status === 403) {
+            throw new Error('Access denied. Your account may not have permission to access this resource.');
+          }
+          if (result.status === 404) {
+            throw new Error('Resource not found. This endpoint may not be available in your Oracle version.');
+          }
+          if (result.status === 429) {
+            const waitTime = Math.pow(2, attempt) * 1000;
+            this._log(`Rate limited, waiting ${waitTime/1000}s before retry...`, 'loading');
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            continue;
+          }
+          throw new Error(`HTTP ${result.status}: ${(result.body || '').substring(0, 200)}`);
         }
 
-        if (!resp.ok) {
-          const text = await resp.text().catch(() => '');
-          throw new Error(`HTTP ${resp.status}: ${text.substring(0, 200)}`);
-        }
-
-        return await resp.json();
+        return result.data;
       } catch (err) {
         lastError = err;
         if (attempt < retries && !err.message.includes('Authentication failed') && !err.message.includes('Access denied')) {
@@ -153,37 +143,26 @@ class HCMDiscovery {
 
     this._log('Authenticating to Oracle HCM...', 'loading');
 
-    // Test connection first with timeout
+    // Test connection first
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-      
       const testUrl = this.restBase + '/workers?limit=1';
-      const resp = await fetch(testUrl, {
-        method: 'GET',
-        headers: this._headers(),
-        signal: controller.signal,
-      });
+      const result = await window.savvy.oracleApi(testUrl, this.username, this.password);
       
-      clearTimeout(timeoutId);
-      
-      if (resp.status === 401) {
-        this._log('Authentication failed. Please check your Oracle credentials.', 'error');
-        return this.data;
-      }
-      
-      if (resp.status === 403) {
-        this._log('Access denied. Your account may not have permission to access HCM APIs.', 'error');
-        return this.data;
-      }
-      
-      if (!resp.ok) {
-        throw new Error(`HTTP ${resp.status}`);
+      if (!result.ok) {
+        if (result.status === 401) {
+          this._log('Authentication failed. Please check your Oracle credentials.', 'error');
+          return this.data;
+        }
+        if (result.status === 403) {
+          this._log('Access denied. Your account may not have permission to access HCM APIs.', 'error');
+          return this.data;
+        }
+        throw new Error(`HTTP ${result.status}`);
       }
       
       this._log('Connected to Oracle HCM', 'done');
     } catch (err) {
-      if (err.name === 'AbortError') {
+      if (err.message.includes('timed out')) {
         this._log('Connection timeout. Please check your Oracle URL and network connection.', 'error');
       } else {
         this._log(`Connection failed: ${err.message}`, 'error');

@@ -23,24 +23,14 @@ async function oracleFetch(resourcePath) {
   }
   const baseUrl = settings.oracleUrl.replace(/\/+$/, '');
   const url = baseUrl + '/hcmRestApi/resources/11.13.18.05' + resourcePath;
-  const auth = 'Basic ' + btoa(settings.oracleUser + ':' + settings.oraclePass);
   console.log('[Oracle] Fetching:', url);
-  let resp;
-  try {
-    resp = await fetch(url, { headers: { Authorization: auth, Accept: 'application/json' } });
-  } catch (err) {
-    console.error('[Oracle] Network error:', err);
-    throw new Error('Network error: ' + err.message + ' — check your Oracle URL is reachable.');
+  const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
+  console.log('[Oracle] Result:', result.ok ? 'OK' : 'FAIL', result.status, result.statusText || '');
+  if (!result.ok) {
+    const detail = result.body ? ' — ' + result.body.slice(0, 200) : '';
+    throw new Error('Oracle API returned ' + result.status + (result.statusText ? ' ' + result.statusText : '') + detail);
   }
-  console.log('[Oracle] Status:', resp.status, resp.statusText);
-  if (!resp.ok) {
-    const body = await resp.text().catch(() => '');
-    console.error('[Oracle] Error body:', body);
-    throw new Error('Oracle API returned ' + resp.status + ': ' + body.slice(0, 200));
-  }
-  const json = await resp.json();
-  console.log('[Oracle] Response keys:', Object.keys(json), 'items count:', json.items?.length);
-  return json;
+  return result.data;
 }
 
 async function loadInitialState() {
@@ -214,14 +204,11 @@ async function autoFetchData(userMessage) {
   for (const ep of endpoints) {
     try {
       const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
-      const auth = 'Basic ' + btoa(settings.oracleUser + ':' + settings.oraclePass);
-      const resp = await fetch(url, { headers: { Authorization: auth, Accept: 'application/json' } });
-      if (!resp.ok) {
-        const body = await resp.text().catch(() => '');
-        throw new Error('HTTP ' + resp.status + ' ' + resp.statusText + (body ? ' — ' + body.slice(0, 200) : ''));
+      const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
+      if (!result.ok) {
+        throw new Error('HTTP ' + result.status + ' ' + (result.statusText || '') + (result.body ? ' — ' + result.body.slice(0, 200) : ''));
       }
-      const data = await resp.json();
-      const items = data?.items || [];
+      const items = result.data?.items || [];
       if (items.length > 0) {
         results.push(`[ORACLE DATA — ${ep.name}] ${items.length} records found:`);
         items.slice(0, 10).forEach((item, i) => {
@@ -424,17 +411,19 @@ async function runDiscovery() {
 
     try {
       const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
-      const auth = 'Basic ' + btoa(settings.oracleUser + ':' + settings.oraclePass);
-      const resp = await fetch(url, { headers: { Authorization: auth, Accept: 'application/json' } });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const data = await resp.json();
-      const items = data?.items || [];
+      console.log('[Discovery] Fetching:', url);
+      const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
+      if (!result.ok) {
+        throw new Error('HTTP ' + result.status + ' ' + (result.statusText || '') + (result.body ? ' — ' + result.body.slice(0, 150) : ''));
+      }
+      const items = result.data?.items || [];
       fetchedData[ep.path] = items;
       totalRecords += items.length;
       successCount++;
       line.textContent = `\u2713 ${ep.name}: ${items.length} records`;
       line.style.color = '#166534';
     } catch (err) {
+      console.error('[Discovery] Failed:', ep.name, err.message);
       failCount++;
       line.textContent = `\u2717 ${ep.name}: ${err.message}`;
       line.style.color = '#991b1b';
@@ -471,11 +460,9 @@ async function runDiscoverySilent() {
   for (const ep of HCM_ENDPOINTS) {
     try {
       const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
-      const auth = 'Basic ' + btoa(settings.oracleUser + ':' + settings.oraclePass);
-      const resp = await fetch(url, { headers: { Authorization: auth, Accept: 'application/json' } });
-      if (!resp.ok) continue;
-      const data = await resp.json();
-      fetchedData[ep.path] = data?.items || [];
+      const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
+      if (!result.ok) continue;
+      fetchedData[ep.path] = result.data?.items || [];
     } catch {}
   }
   discoveryData = fetchedData;

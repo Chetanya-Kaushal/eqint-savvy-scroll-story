@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain, screen, desktopCapturer, Tray, Menu, globalShortcut, session, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
+const http = require('http');
 const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
 const Sentry = require('@sentry/electron/main');
@@ -106,6 +108,46 @@ ipcMain.handle('set-settings', (e, newSettings) => {
   const updatedSettings = { ...currentSettings, ...newSettings };
   store.set('settings', updatedSettings);
   return true;
+});
+
+// Oracle HCM REST API proxy — bypasses CORS by making requests from main process
+ipcMain.handle('oracle-api', async (e, { url, user, pass }) => {
+  return new Promise((resolve, reject) => {
+    const auth = 'Basic ' + Buffer.from(user + ':' + pass).toString('base64');
+    const parsed = new URL(url);
+    const transport = parsed.protocol === 'https:' ? https : http;
+    const req = transport.get({
+      hostname: parsed.hostname,
+      port: parsed.port,
+      path: parsed.pathname + parsed.search,
+      headers: {
+        Authorization: auth,
+        Accept: 'application/json',
+      },
+      timeout: 15000,
+    }, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          resolve({ ok: false, status: res.statusCode, statusText: res.statusMessage, body: body.slice(0, 500) });
+        } else {
+          try {
+            resolve({ ok: true, status: res.statusCode, data: JSON.parse(body) });
+          } catch {
+            resolve({ ok: false, status: res.statusCode, statusText: 'Invalid JSON', body: body.slice(0, 500) });
+          }
+        }
+      });
+    });
+    req.on('error', (err) => {
+      resolve({ ok: false, status: 0, statusText: err.message, body: '' });
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ ok: false, status: 0, statusText: 'Request timed out (15s)', body: '' });
+    });
+  });
 });
 
 ipcMain.handle('capture-screen', async () => {
