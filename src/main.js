@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const https = require('https');
 const http = require('http');
+const zlib = require('zlib');
 const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
 const Sentry = require('@sentry/electron/main');
@@ -140,37 +141,53 @@ ipcMain.handle('oracle-api', async (e, { url, user, pass }) => {
   console.log('[Oracle] API call:', url);
   return new Promise((resolve, reject) => {
     const auth = 'Basic ' + Buffer.from(user + ':' + pass).toString('base64');
-    const parsed = new URL(url);
-    const transport = parsed.protocol === 'https:' ? https : http;
+    const parsedUrl = new URL(url);
+    const transport = parsedUrl.protocol === 'https:' ? https : http;
     const req = transport.get({
-      hostname: parsed.hostname,
-      port: parsed.port,
-      path: parsed.pathname + parsed.search,
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port,
+      path: parsedUrl.pathname + parsedUrl.search,
       headers: {
         Authorization: auth,
         Accept: 'application/json',
+        'Accept-Encoding': 'gzip, deflate, br',
       },
       timeout: 15000,
     }, (res) => {
-      let body = '';
-      res.on('data', (chunk) => { body += chunk; });
+      const chunks = [];
+      res.on('data', (chunk) => { chunks.push(chunk); });
       res.on('end', () => {
+        const rawBuffer = Buffer.concat(chunks);
+        // Oracle Cloud's edge/WAF layer compresses responses (including error bodies)
+        // regardless — decompress based on the actual Content-Encoding header rather
+        // than assuming plaintext, or error messages come through as unreadable bytes.
+        const encoding = (res.headers['content-encoding'] || '').toLowerCase();
+        let body;
+        try {
+          if (encoding.includes('gzip')) body = zlib.gunzipSync(rawBuffer).toString('utf8');
+          else if (encoding.includes('br')) body = zlib.brotliDecompressSync(rawBuffer).toString('utf8');
+          else if (encoding.includes('deflate')) body = zlib.inflateSync(rawBuffer).toString('utf8');
+          else body = rawBuffer.toString('utf8');
+        } catch (err) {
+          body = rawBuffer.toString('utf8');
+        }
+
         if (res.statusCode < 200 || res.statusCode >= 300) {
           resolve({ ok: false, status: res.statusCode, statusText: res.statusMessage, body: body.slice(0, 500) });
         } else {
           try {
-            const parsed = JSON.parse(body);
+            const parsedBody = JSON.parse(body);
             // Log first item's keys for diagnostics
-            if (parsed.items && parsed.items.length > 0) {
-              console.log('[Oracle] Response keys:', Object.keys(parsed.items[0]).join(', '));
-              console.log('[Oracle] Items (' + parsed.items.length + '):');
-              parsed.items.forEach((item, i) => {
+            if (parsedBody.items && parsedBody.items.length > 0) {
+              console.log('[Oracle] Response keys:', Object.keys(parsedBody.items[0]).join(', '));
+              console.log('[Oracle] Items (' + parsedBody.items.length + '):');
+              parsedBody.items.forEach((item, i) => {
                 console.log('  #' + (i + 1), JSON.stringify(item));
               });
             } else {
               console.log('[Oracle] Response (no items):', body.slice(0, 500));
             }
-            resolve({ ok: true, status: res.statusCode, data: parsed });
+            resolve({ ok: true, status: res.statusCode, data: parsedBody });
           } catch {
             resolve({ ok: false, status: res.statusCode, statusText: 'Invalid JSON', body: body.slice(0, 500) });
           }

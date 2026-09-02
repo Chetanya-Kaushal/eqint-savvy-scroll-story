@@ -1,6 +1,7 @@
 const { HCMDiscovery } = require('./hcm-discovery');
 const { classifyOracleError } = require('./access-control');
 const { detectPersonNumber } = require('./person-query-parser');
+const { WORKERS_EXPAND, todayDate, flattenWorkerItem } = require('./worker-profile');
 
 let settings = {
   ollamaUrl: 'http://localhost:11434',
@@ -65,17 +66,23 @@ async function loadInitialState() {
   detectCurrentUser();
 }
 
-// Detect current user by matching Oracle username to worker record
+// Detect current user by matching Oracle username to worker record. Not every Oracle
+// login corresponds to a worker (e.g. an admin/integration account) — in that case this
+// intentionally leaves currentUserPersonNumber unset rather than guessing, so "my"
+// queries can tell the user their login isn't tied to a specific employee record
+// instead of silently showing everyone's data.
 async function detectCurrentUser() {
   if (!settings.oracleUrl || !settings.oracleUser) return;
   try {
-    const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&q=UserName=\'' + encodeURIComponent(settings.oracleUser) + '\'&limit=1';
+    const url = settings.oracleUrl.replace(/\/+$/, '') + `/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&${WORKERS_EXPAND}&effectiveDate=${todayDate()}&q=UserName='` + encodeURIComponent(settings.oracleUser) + '\'&limit=1';
     const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
     if (result.ok && result.data?.items?.length > 0) {
-      const me = result.data.items[0];
-      currentUserPersonNumber = me.PersonNumber || me.personNumber;
-      currentUserDisplayName = me.DisplayName || me.displayName || ((me.FirstName || me.firstName || '') + ' ' + (me.LastName || me.lastName || '')).trim();
+      const me = flattenWorkerItem(result.data.items[0]);
+      currentUserPersonNumber = me.PersonNumber;
+      currentUserDisplayName = me.DisplayName || ((me.FirstName || '') + ' ' + (me.LastName || '')).trim();
       console.log('[Savvy] Current user detected:', currentUserDisplayName, '#', currentUserPersonNumber);
+    } else {
+      console.log('[Savvy] No worker record found for this login — "my" queries will ask for a specific person instead.');
     }
   } catch (err) {
     console.log('[Savvy] Could not detect current user:', err.message);
@@ -231,15 +238,6 @@ async function autoFetchData(userMessage) {
     return { type: 'text', text: '[INFO] No specific data matched. Try asking about employees, absences, departments, jobs, grades, time, payroll, benefits, goals, learning, recruiting, etc.' };
   }
 
-  // Step 1: Detect "my" context — use stored current user
-  const isMyQuery = /\bmy\b|\bme\b|\bmine\b|\bmyself\b/i.test(userMessage);
-  if (isMyQuery && currentUserPersonNumber) {
-    return await fetchDataForPerson({
-      personNumber: currentUserPersonNumber,
-      displayName: currentUserDisplayName || 'You',
-    }, endpoints);
-  }
-
   // Step 2: Detect Person Number (alphanumeric like NM290, or pure numeric) — must run
   // against the ORIGINAL message (not the lowercased `msg`), since alphanumeric codes
   // carry meaningful uppercase letters, and must not require the literal word "number".
@@ -259,36 +257,55 @@ async function autoFetchData(userMessage) {
     }
   }
 
+  // Step 1: Detect "my" context — use stored current user. Only applies when no
+  // explicit person number/name was already found above — an explicit reference in
+  // the message always wins over generic conversational phrasing like "show me...",
+  // which is not actually a self-reference just because it contains the word "me".
+  const isMyQuery = !personNumber && !personName && /\bmy\b|\bme\b|\bmine\b|\bmyself\b/i.test(userMessage);
+  if (isMyQuery && currentUserPersonNumber) {
+    return await fetchDataForPerson({
+      personNumber: currentUserPersonNumber,
+      displayName: currentUserDisplayName || 'You',
+    }, endpoints);
+  }
+  if (isMyQuery && !currentUserPersonNumber) {
+    // Never silently fall through to an unfiltered "everyone's data" fetch when the
+    // user asked for "my" data — this login isn't linked to a specific employee
+    // record in the system (e.g. an admin/integration account), so say so plainly
+    // instead of showing data that looks like theirs but isn't.
+    return { type: 'no-data', text: "This login isn't linked to a specific employee record in the system, so I can't show \"your\" data. Try asking about a specific person by name or employee number instead." };
+  }
+
   // Step 3: Resolve person — either by number or by name search
   let resolvedPersons = [];
 
   if (personNumber) {
     // Direct lookup by PersonNumber
     try {
-      const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&q=PersonNumber=\'' + encodeURIComponent(personNumber) + '\'&limit=5';
+      const url = settings.oracleUrl.replace(/\/+$/, '') + `/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&${WORKERS_EXPAND}&effectiveDate=${todayDate()}&q=PersonNumber='` + encodeURIComponent(personNumber) + '\'&limit=5';
       console.log('[Renderer] Resolving person:', personNumber, url);
       const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
       console.log('[Renderer] Resolve result: ok=' + result.ok, 'status=' + result.status, 'items=' + (result.data?.items?.length || 0));
       if (result.ok && result.data?.items?.length > 0) {
-        resolvedPersons = result.data.items.map(p => ({
+        resolvedPersons = result.data.items.map(flattenWorkerItem).map(p => ({
           personNumber: p.PersonNumber,
           displayName: p.DisplayName || ((p.FirstName || '') + ' ' + (p.LastName || '')).trim(),
           department: p.DepartmentName || '',
-          job: p.JobName || '',
+          job: p.JobTitle || '',
         }));
       }
     } catch {}
   } else if (personName) {
     // Search by name
     try {
-      const url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&q=DisplayName LIKE \'%25' + encodeURIComponent(personName) + '%25\'&sortBy=DisplayName:asc&limit=10';
+      const url = settings.oracleUrl.replace(/\/+$/, '') + `/hcmRestApi/resources/11.13.18.05/workers?onlyData=true&${WORKERS_EXPAND}&effectiveDate=${todayDate()}&q=DisplayName LIKE '%25` + encodeURIComponent(personName) + '%25\'&sortBy=DisplayName:asc&limit=10';
       const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
       if (result.ok && result.data?.items?.length > 0) {
-        resolvedPersons = result.data.items.map(p => ({
+        resolvedPersons = result.data.items.map(flattenWorkerItem).map(p => ({
           personNumber: p.PersonNumber,
           displayName: p.DisplayName || ((p.FirstName || '') + ' ' + (p.LastName || '')).trim(),
           department: p.DepartmentName || '',
-          job: p.JobName || '',
+          job: p.JobTitle || '',
         }));
       }
     } catch {}
@@ -326,7 +343,8 @@ async function fetchDataForPerson(person, endpoints) {
     try {
       let url = settings.oracleUrl.replace(/\/+$/, '') + '/hcmRestApi/resources/11.13.18.05' + ep.path + ep.params;
       if (person) {
-        url += '&q=PersonNumber=\'' + encodeURIComponent(person.personNumber) + '\'';
+        const filterField = ep.personFilterField || 'PersonNumber';
+        url += `&q=${filterField}='` + encodeURIComponent(person.personNumber) + '\'';
       }
       console.log('[Renderer] Fetching:', ep.name, url);
       const result = await window.savvy.oracleApi(url, settings.oracleUser, settings.oraclePass);
@@ -344,7 +362,8 @@ async function fetchDataForPerson(person, endpoints) {
         results.push(`[NO ACCESS — ${ep.name}] ${reason}`);
         continue;
       }
-      const items = result.data?.items || [];
+      const rawItems = result.data?.items || [];
+      const items = ep.path === '/workers' ? rawItems.map(flattenWorkerItem) : rawItems;
       const label = person ? ep.name + ' for ' + person.displayName : ep.name;
       if (items.length > 0) {
         results.push(`[ORACLE DATA — ${label}] ${items.length} records found:`);
@@ -405,10 +424,9 @@ const FORMATTERS = {
   '/workers': (w) => {
     const name = w.DisplayName || ((w.FirstName || '') + ' ' + (w.LastName || '')).trim() || 'N/A';
     const dept = w.DepartmentName || '';
-    const job = w.JobName || w.PositionName || '';
-    const loc = w.LocationName || '';
-    const status = w.EmploymentStatus || w.WorkerType || '';
-    return `Name: ${name}${dept ? ' | Dept: ' + dept : ''}${job ? ' | Job: ' + job : ''}${loc ? ' | Location: ' + loc : ''}${status ? ' | Status: ' + status : ''}`;
+    const job = w.JobTitle || '';
+    const status = w.EmploymentStatus || '';
+    return `Name: ${name}${dept ? ' | Dept: ' + dept : ''}${job ? ' | Job: ' + job : ''}${status ? ' | Status: ' + status : ''}`;
   },
   '/absences': (a) => `Type: ${a.AbsenceType || a.AbsenceTypeName || 'N/A'} | From: ${a.StartDate || 'N/A'} | To: ${a.EndDate || 'N/A'} | Days: ${a.AbsenceDays || a.Duration || 'N/A'} | Status: ${a.AbsenceStatus || a.ApprovalStatus || 'N/A'}`,
   '/organizations': (d) => `Name: ${d.Name || d.OrganizationName || 'N/A'} | Manager: ${d.ManagerName || ''} | Location: ${d.LocationName || ''}`,
@@ -461,8 +479,15 @@ function formatDate(d) {
 
 const { pickDisplayLabel } = require('./name-resolver');
 
-function formatItemAsHTML(path, item, idx) {
-  const label = pickDisplayLabel(item) || 'Team member';
+// Renders one row of a data list. Always prefers the endpoint-specific formatter in
+// HTML_FORMATTERS (which knows the real, relevant fields for that record type — an
+// absence's type and dates, a department's name, etc.) over the generic name-lookup
+// fallback, so the card actually shows information relevant to what was asked for
+// instead of a placeholder that only makes sense for people.
+function formatItemAsHTML(path, item, idx, epName) {
+  const formatter = HTML_FORMATTERS[path];
+  if (formatter) return formatter(item, idx);
+  const label = pickDisplayLabel(item) || (epName ? `${epName.replace(/s$/, '')} record` : 'Record');
   return `<div class="data-row"><span class="data-idx">#${idx}</span><span class="data-field"><b>${escapeHtml(label)}</b></span></div>`;
 }
 
@@ -474,15 +499,12 @@ const PERSON_PROFILE_FIELDS = [
   { key: 'EmailAddress', label: 'Email', section: 'personal' },
   { key: 'PhoneNumber', label: 'Phone', section: 'personal' },
   { key: 'DateOfBirth', label: 'Birthday', section: 'personal', isDate: true },
-  { key: 'HomeCountry', label: 'Country', section: 'personal' },
-  { key: 'JobName', label: 'Job title', section: 'employment' },
-  { key: 'PositionName', label: 'Position', section: 'employment' },
+  { key: 'JobTitle', label: 'Job title', section: 'employment' },
   { key: 'DepartmentName', label: 'Department', section: 'employment' },
-  { key: 'LocationName', label: 'Location', section: 'employment' },
-  { key: 'ManagerName', label: 'Manager', section: 'employment' },
-  { key: 'HireDate', label: 'Started on', section: 'employment', isDate: true },
+  { key: 'BusinessUnitName', label: 'Company', section: 'employment' },
+  { key: 'StartDate', label: 'Started on', section: 'employment', isDate: true },
   { key: 'EmploymentStatus', label: 'Status', section: 'employment' },
-  { key: 'WorkerType', label: 'Employment type', section: 'employment' },
+  { key: 'EmploymentType', label: 'Employment type', section: 'employment' },
 ];
 
 function buildPersonProfileHTML(item) {
@@ -577,7 +599,7 @@ function buildFormattedList(epName, epPath, items, maxShow = 10, isTypeList = fa
     let html = `<div class="data-section"><div class="data-header"><span class="data-icon">&#9679;</span> <b>${escapeHtml(epName)}</b> — ${total} available</div>`;
     html += '<div style="padding:4px 8px;">';
     for (let i = 0; i < showing; i++) {
-      const name = items[i].AbsenceTypeName || items[i].absenceTypeName || items[i].Name || items[i].name || JSON.stringify(items[i]).slice(0, 50);
+      const name = items[i].AbsenceTypeName || items[i].absenceTypeName || items[i].Name || items[i].name || `${epName.replace(/s$/, '')} type`;
       html += `<div style="padding:3px 0;font-size:12px;">&#8226; <b>${escapeHtml(name)}</b></div>`;
     }
     if (total > maxShow) {
@@ -592,7 +614,7 @@ function buildFormattedList(epName, epPath, items, maxShow = 10, isTypeList = fa
   // Regular records: show as numbered rows
   let html = `<div class="data-section"><div class="data-header"><span class="data-icon">&#9679;</span> <b>${escapeHtml(epName)}</b> — ${total} record${total !== 1 ? 's' : ''}</div>`;
   for (let i = 0; i < showing; i++) {
-    html += formatItemAsHTML(epPath, items[i], i + 1);
+    html += formatItemAsHTML(epPath, items[i], i + 1, epName);
   }
   if (total > maxShow) {
     html += `<div class="data-more">${total - maxShow} more records not shown. Ask me to "show all ${epName.toLowerCase()}" to see the full list.</div>`;
@@ -675,24 +697,19 @@ CRITICAL RULES:
               html += renderDataBlock(parts[2], parts[3], items);
             } catch {}
           }
+          // Show the real fetched data card only — no LLM prose on top of it, for the
+          // same reason as the main sendMessage flow: a small local model has been
+          // directly observed inventing details not present in the actual record.
           if (html) {
             const dataDiv = document.createElement('div');
             dataDiv.className = 'msg bot';
             dataDiv.innerHTML = `<div class="msg-avatar">EQ</div><div class="msg-text">${html}</div>`;
             container.appendChild(dataDiv);
           }
-          const llmText = result.text.split('\n').filter(l => !l.startsWith('__HTML__')).join('\n');
-          const botMsg = addMessage('', 'bot');
-          const sysPrompt2 = 'You are Savvy, an Oracle Fusion HCM assistant. Use the full data provided to answer. Never show ID numbers, codes, or field names - use plain, everyday language a non-technical person would understand. Be brief.';
-          const recentHist2 = conversationHistory.slice(-10).map(h => ({ role: h.role === 'bot' ? 'assistant' : 'user', content: h.content }));
-          let selectionText = '';
-          const reply = await callLLM([{ role: 'system', content: sysPrompt2 }, ...recentHist2, { role: 'user', content: llmText }], (chunk) => {
-            selectionText += chunk;
-            botMsg.querySelector('.msg-text').innerHTML = formatMarkdown(selectionText);
-            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-          });
+          const note = 'Everything shown above is on file in the system — nothing more is available right now.';
+          addMessage(note, 'bot');
           conversationHistory.push({ role: 'user', content: `Selected: ${name} (#${pn})`, timestamp: Date.now() });
-          conversationHistory.push({ role: 'bot', content: selectionText || reply, timestamp: Date.now() });
+          conversationHistory.push({ role: 'bot', content: note, timestamp: Date.now() });
           try { await window.savvy.saveConversationHistory(conversationHistory.slice(-100)); } catch {}
         } else if (result.type === 'no-data') {
           addMessage(result.text, 'bot');
@@ -728,14 +745,12 @@ CRITICAL RULES:
 
   // Handle data
   let htmlSections = '';
-  let hasSinglePersonProfile = false;
   if (fetchedData && fetchedData.text) {
     const htmlLines = fetchedData.text.split('\n').filter(l => l.startsWith('__HTML__'));
     for (const line of htmlLines) {
       const parts = line.split('__');
       try {
         const items = JSON.parse(parts.slice(5).join('__'));
-        if (parts[3] === '/workers' && items.length === 1) hasSinglePersonProfile = true;
         htmlSections += renderDataBlock(parts[2], parts[3], items);
       } catch {}
     }
@@ -773,18 +788,17 @@ CRITICAL RULES:
     { role: 'user', content: fullMsg }
   ];
 
-  // Show the formatted data card first (if any) — then continue on to ask the LLM to
-  // answer the user's specific question using the full data already folded into
-  // `fullMsg` above. Showing a name card is not the same as answering "what is their
-  // department" — the LLM call is what actually answers the question asked.
-  //
-  // Exception: when exactly one Workers record resolved, the profile card above was
-  // built directly from whitelisted real fields and can never contain anything not
-  // actually in the system. Do NOT ask the LLM to add free-form prose on top of it —
-  // a small local model has been directly observed inventing a plausible-sounding
-  // name, department, and job title when the real record was too sparse to answer,
-  // which is exactly what showing data from the system, and only from the system,
-  // must never do. The card is the complete, trustworthy answer on its own.
+  // Show the formatted data card whenever any real Oracle data was fetched, and stop
+  // there — do NOT ask the LLM to add free-form prose on top of it. Every card is
+  // built directly from whitelisted real fields (renderDataBlock / HTML_FORMATTERS /
+  // buildPersonProfileHTML) and can never contain anything not actually in the
+  // system. This was verified against a real Oracle tenant: a small local model
+  // reliably invents plausible-sounding names, departments, dates, and even fake
+  // record IDs when asked to narrate real fetched data in prose, no matter how the
+  // system prompt is worded. The card is the complete, trustworthy answer on its
+  // own. The LLM is only ever consulted below when NO data card was produced —
+  // general HCM knowledge questions, or a "no records found" result — where there
+  // is no specific fetched data it could misrepresent.
   const container = document.getElementById('messages');
   if (htmlSections) {
     const dataDiv = document.createElement('div');
@@ -792,10 +806,8 @@ CRITICAL RULES:
     dataDiv.innerHTML = `<div class="msg-avatar">EQ</div><div class="msg-text">${htmlSections}</div>`;
     container.appendChild(dataDiv);
     container.scrollTop = container.scrollHeight;
-  }
 
-  if (hasSinglePersonProfile) {
-    const note = 'Only the details shown above are on file for this person in the system.';
+    const note = 'Everything shown above is on file in the system — nothing more is available right now.';
     addMessage(note, 'bot');
     conversationHistory.push({ role: 'user', content: msg, timestamp: Date.now() });
     conversationHistory.push({ role: 'bot', content: note, timestamp: Date.now() });
@@ -824,7 +836,7 @@ let discoveryInterval = null;
 
 const HCM_ENDPOINTS = [
   // ── Core HR & Workforce ──
-  { name: 'Workers', path: '/workers', params: '?onlyData=true&limit=20', keywords: ['employee', 'worker', 'person', 'team', 'headcount', 'hire', 'name', 'number'] },
+  { name: 'Workers', path: '/workers', params: `?onlyData=true&limit=20&${WORKERS_EXPAND}&effectiveDate=${todayDate()}`, keywords: ['employee', 'worker', 'person', 'team', 'headcount', 'hire', 'name', 'number'] },
   { name: 'Employees', path: '/emps', params: '?onlyData=true&limit=20', keywords: ['emp', 'employee list'] },
   { name: 'Public Workers', path: '/publicWorkers', params: '?onlyData=true&limit=20', keywords: ['public worker', 'public profile'] },
   { name: 'Organizations', path: '/organizations', params: '?onlyData=true&limit=20', keywords: ['department', 'dept', 'org', 'organization', 'division', 'team'] },
@@ -836,7 +848,14 @@ const HCM_ENDPOINTS = [
   { name: 'HCM Contacts', path: '/hcmContacts', params: '?onlyData=true&limit=20', keywords: ['contact', 'emergency', 'next of kin'] },
 
   // ── Absences ──
-  { name: 'Absences', path: '/absences', params: '?onlyData=true&limit=20', keywords: ['absence', 'leave', 'time off', 'vacation', 'sick', 'absence record', 'leave record', 'my absences', 'leave history'] },
+  // personFilterField: Oracle's query-filter attribute names are case-sensitive and
+  // inconsistent across resources — /workers uses PascalCase (PersonNumber), but
+  // /absences' actual response fields are camelCase (personNumber), confirmed live
+  // against a real tenant (PascalCase gets rejected with a 400 "not valid" error on
+  // this resource specifically). Defaults to 'PersonNumber' for entries that don't
+  // override it — those are unverified against a real tenant and may need the same
+  // treatment if they turn out to need camelCase too.
+  { name: 'Absences', path: '/absences', params: '?onlyData=true&limit=20', personFilterField: 'personNumber', keywords: ['absence', 'leave', 'time off', 'vacation', 'sick', 'absence record', 'leave record', 'my absences', 'leave history'] },
   { name: 'Absence Types', path: '/absenceTypesLOV', params: '?onlyData=true&limit=50', keywords: ['absence type', 'leave type', 'absence category', 'types of absence', 'types of leave'], isTypeList: true },
   { name: 'Absence Plans', path: '/absencePlansLOV', params: '?onlyData=true&limit=50', keywords: ['absence plan', 'leave plan', 'entitlement'] },
   { name: 'Absence Calendars', path: '/absenceCalendars', params: '?onlyData=true&limit=20', keywords: ['absence calendar', 'leave calendar', 'org calendar'] },
