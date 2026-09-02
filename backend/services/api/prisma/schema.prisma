@@ -8,15 +8,20 @@ datasource db {
 }
 
 model Tenant {
-  id                String            @id @default(uuid())
-  name              String
-  oracleBaseUrl     String
-  oracleServiceUser String?
-  oracleServicePass String?
-  createdAt         DateTime          @default(now())
-  users             User[]
-  referenceRecords  ReferenceRecord[]
-  auditLogs         AuditLog[]
+  id                           String            @id @default(uuid())
+  name                         String
+  oracleBaseUrl                String
+  oracleServiceUser            String?
+  oracleServicePass            String?
+  oidcIssuerUrl                String?
+  oidcClientId                 String?
+  oidcRedirectUri              String?
+  oidcTokenExchangeClientId    String?
+  oidcTokenExchangeClientSecret String?
+  createdAt                    DateTime          @default(now())
+  users                        User[]
+  referenceRecords             ReferenceRecord[]
+  auditLogs                    AuditLog[]
 }
 
 model User {

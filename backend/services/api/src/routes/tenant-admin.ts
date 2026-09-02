@@ -24,4 +24,28 @@ export function registerTenantAdminRoutes(server: FastifyInstance): void {
       return tenant;
     }
   );
+
+  server.patch<{
+    Params: { tenantId: string };
+    Body: {
+      oidcIssuerUrl: string;
+      oidcClientId: string;
+      oidcRedirectUri: string;
+      oidcTokenExchangeClientId?: string;
+      oidcTokenExchangeClientSecret?: string;
+    };
+  }>('/tenants/:tenantId/oidc-config', { preHandler: requireRole('tenant_admin') }, async (request, reply) => {
+    const session = (request as FastifyRequest & { session: SessionClaims }).session;
+    if (session.tenantId !== request.params.tenantId) {
+      return reply.code(403).send({ error: 'Cannot modify a different tenant' });
+    }
+
+    const { oidcTokenExchangeClientSecret, ...rest } = request.body;
+    const data: Record<string, string> = { ...rest };
+    if (oidcTokenExchangeClientSecret) data.oidcTokenExchangeClientSecret = encryptField(oidcTokenExchangeClientSecret);
+
+    const tenant = await prisma.tenant.update({ where: { id: request.params.tenantId }, data });
+    await writeAuditLog({ tenantId: tenant.id, actor: session.userId, action: 'oidc_config_updated', scope: 'tenant_admin' });
+    return tenant;
+  });
 }
