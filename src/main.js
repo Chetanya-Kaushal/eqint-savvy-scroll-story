@@ -80,11 +80,18 @@ function createOverlay() {
   overlayWindow.loadFile(path.join(__dirname, 'overlay.html'));
   overlayWindow.setVisibleOnAllWorkspaces(true);
 
-  // Save position on move
+  // Save position on move - but only if not in bubble mode. Without this check,
+  // moveOverlayToCorner()'s own setPosition() call (moving the window to the bubble
+  // corner) fires this same 'move' event and immediately overwrites the pre-collapse
+  // position it just saved a moment earlier, so expanding later restores the bubble's
+  // corner position instead of where the window actually was - pushing most of the
+  // expanded window off-screen.
   overlayWindow.on('move', () => {
-    const [x, y] = overlayWindow.getPosition();
-    store.set('overlayX', x);
-    store.set('overlayY', y);
+    if (!store.get('isBubbleMode', false)) {
+      const [x, y] = overlayWindow.getPosition();
+      store.set('overlayX', x);
+      store.set('overlayY', y);
+    }
   });
 
   // Save size on resize - but only if not in bubble mode
