@@ -942,8 +942,14 @@ CRITICAL RULES:
 
 const HCM_ENDPOINTS = [
   // ── Core HR & Workforce ──
-  { name: 'Workers', path: '/workers', params: `?onlyData=true&limit=20&${WORKERS_EXPAND}`, keywords: ['employee', 'worker', 'person', 'team', 'headcount', 'hire', 'name', 'number'] },
-  { name: 'Employees', path: '/emps', params: '?onlyData=true&limit=20', keywords: ['emp', 'employee list'] },
+  { name: 'Workers', path: '/workers', params: `?onlyData=true&limit=20&${WORKERS_EXPAND}`, keywords: ['employee', 'employment', 'worker', 'person', 'team', 'headcount', 'hire', 'name', 'number'] },
+  // 'emp' was previously a keyword here too, but as a bare 3-letter substring it
+  // silently matched unrelated words like "employment" (msg.includes('emp')),
+  // misrouting "employment details" to /emps — a resource live-verified to return
+  // a blanket 403 for this tenant's accounts, when /workers (which actually has
+  // JobTitle/DepartmentName/EmploymentStatus/StartDate, and works) was the intended
+  // target. Keep only the specific phrase.
+  { name: 'Employees', path: '/emps', params: '?onlyData=true&limit=20', keywords: ['employee list'] },
   { name: 'Public Workers', path: '/publicWorkers', params: '?onlyData=true&limit=20', keywords: ['public worker', 'public profile'] },
   { name: 'Organizations', path: '/organizations', params: '?onlyData=true&limit=20', keywords: ['department', 'dept', 'org', 'organization', 'division', 'team'] },
   { name: 'Positions', path: '/positions', params: '?onlyData=true&limit=20', keywords: ['position', 'posting', 'job position'] },
