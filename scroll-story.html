@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EQInt Savvy — Oracle HCM AI Desktop Overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#06060b;--bg2:#0c0c14;--surface:#12121e;--surface2:#1a1a2e;
+  --border:#2a2a3e;--border2:#3a3a5e;
+  --text:#e8e8f0;--text2:#a0a0b8;--text3:#6a6a80;
+  --accent:#00d4ff;--accent2:#00ff88;--accent3:#a855f7;--accent4:#f97316;
+  --glow:rgba(0,212,255,0.15);--glow2:rgba(0,255,136,0.1);
+  --grad1:linear-gradient(135deg,#00d4ff,#00ff88);
+  --grad2:linear-gradient(135deg,#a855f7,#ec4899);
+  --grad3:linear-gradient(135deg,#f97316,#ef4444);
+  --grad4:linear-gradient(135deg,#06b6d4,#3b82f6);
+  --font-head:'Space Grotesk',sans-serif;
+  --font-body:'Inter',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+}
+html{scroll-behavior:auto;overflow-x:hidden}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+
+/* Three.js canvas */
+#three-canvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+
+/* Scroll progress bar */
+#scroll-progress{position:fixed;top:0;left:0;height:3px;background:var(--grad1);z-index:9999;transform-origin:left;transform:scaleX(0);width:100%}
+
+/* Section base */
+section{position:relative;z-index:1;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:80px 40px;overflow:hidden}
+.section-inner{max-width:1200px;width:100%;position:relative;z-index:2}
+
+/* Navigation */
+#nav{position:fixed;top:0;left:0;right:0;z-index:1000;padding:16px 40px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(20px);background:rgba(6,6,11,0.7);border-bottom:1px solid rgba(255,255,255,0.05);transform:translateY(-100%);transition:transform 0.4s cubic-bezier(0.16,1,0.3,1)}
+#nav.visible{transform:translateY(0)}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo-icon{width:32px;height:32px;border-radius:8px;background:var(--grad1);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#000}
+.nav-logo-text{font-family:var(--font-head);font-weight:700;font-size:16px;color:var(--text)}
+.nav-links{display:flex;gap:32px}
+.nav-links a{color:var(--text2);text-decoration:none;font-size:13px;font-weight:500;transition:color 0.2s;position:relative}
+.nav-links a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;background:var(--grad1);transition:width 0.3s}
+.nav-links a:hover{color:var(--text)}
+.nav-links a:hover::after{width:100%}
+
+/* HERO section */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;position:relative;perspective:1200px}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 20px;border:1px solid var(--border);border-radius:100px;font-size:12px;font-weight:600;color:var(--accent);background:rgba(0,212,255,0.05);margin-bottom:32px;letter-spacing:0.5px;text-transform:uppercase}
+.hero-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--accent2);animation:pulse-dot 2s ease-in-out infinite}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.5)}}
+.hero-title{font-family:var(--font-head);font-size:clamp(48px,8vw,120px);font-weight:700;line-height:0.95;letter-spacing:-3px;margin-bottom:24px}
+.hero-title .line{display:block;overflow:hidden}
+.hero-title .line span{display:inline-block}
+.hero-title .gradient{background:var(--grad1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-title .outline{-webkit-text-stroke:1.5px var(--text);-webkit-text-fill-color:transparent}
+.hero-sub{font-size:clamp(16px,2vw,20px);color:var(--text2);max-width:640px;line-height:1.6;margin-bottom:48px;font-weight:400}
+.hero-cta{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;border-radius:12px;font-family:var(--font-head);font-weight:600;font-size:14px;text-decoration:none;cursor:pointer;border:none;background:var(--grad1);color:#000;transition:all 0.3s cubic-bezier(0.16,1,0.3,1);position:relative;overflow:hidden}
+.btn-primary::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.2),transparent);opacity:0;transition:opacity 0.3s}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,212,255,0.3)}
+.btn-primary:hover::before{opacity:1}
+.btn-outline{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;border-radius:12px;font-family:var(--font-head);font-weight:600;font-size:14px;text-decoration:none;cursor:pointer;background:transparent;color:var(--text);border:1px solid var(--border);transition:all 0.3s cubic-bezier(0.16,1,0.3,1)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,212,255,0.1)}
+
+/* Scroll indicator */
+.scroll-indicator{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text3);font-size:11px;letter-spacing:2px;text-transform:uppercase}
+.scroll-line{width:1px;height:60px;background:linear-gradient(to bottom,var(--accent),transparent);animation:scroll-pulse 2s ease-in-out infinite}
+@keyframes scroll-pulse{0%,100%{opacity:0.3;transform:scaleY(0.5)}50%{opacity:1;transform:scaleY(1)}}
+
+/* Feature sections */
+.feature-section{min-height:100vh;padding:120px 40px;position:relative;z-index:2}
+.feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
+.feature-grid.reverse{direction:rtl}
+.feature-grid.reverse > *{direction:ltr}
+.feature-content{position:relative}
+.feature-label{font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:3px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.feature-label::before{content:'';width:24px;height:1px;background:var(--accent)}
+.feature-title{font-family:var(--font-head);font-size:clamp(32px,4vw,56px);font-weight:700;line-height:1.05;letter-spacing:-1.5px;margin-bottom:20px}
+.feature-desc{font-size:16px;color:var(--text2);line-height:1.7;margin-bottom:32px;max-width:480px}
+.feature-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
+.stat-card{padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:16px;transition:all 0.4s cubic-bezier(0.16,1,0.3,1);position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--grad1);transform:scaleX(0);transition:transform 0.4s cubic-bezier(0.16,1,0.3,1);transform-origin:left}
+.stat-card:hover{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 12px 40px rgba(0,212,255,0.1)}
+.stat-card:hover::before{transform:scaleX(1)}
+.stat-num{font-family:var(--font-head);font-size:28px;font-weight:700;background:var(--grad1);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.stat-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+
+/* Feature visual (mockup) */
+.feature-visual{position:relative;perspective:800px}
+.mockup-frame{background:var(--surface);border:1px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:0 40px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.03);transition:transform 0.6s cubic-bezier(0.16,1,0.3,1),box-shadow 0.6s;transform-style:preserve-3d}
+.mockup-frame:hover{transform:rotateY(-3deg) rotateX(2deg) translateZ(20px);box-shadow:0 60px 100px rgba(0,0,0,0.6),0 0 60px var(--glow)}
+.mockup-titlebar{height:36px;background:linear-gradient(135deg,rgba(0,112,243,0.85),rgba(0,201,167,0.85));display:flex;align-items:center;padding:0 14px;gap:8px;position:relative;overflow:hidden}
+.mockup-titlebar::after{content:'';position:absolute;top:0;left:-100%;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);animation:shimmer 4s ease-in-out infinite}
+@keyframes shimmer{0%,100%{left:-100%}50%{left:150%}}
+.mockup-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.3)}
+.mockup-title{font-size:11px;color:white;font-weight:600;margin-left:8px}
+.mockup-body{padding:20px;min-height:300px;background:var(--bg2);position:relative}
+.mockup-line{height:8px;border-radius:4px;background:var(--border);margin-bottom:10px;transition:width 0.6s cubic-bezier(0.16,1,0.3,1)}
+.mockup-line.short{width:40%}
+.mockup-line.med{width:65%}
+.mockup-line.long{width:90%}
+.mockup-line.accent{background:var(--grad1);opacity:0.4}
+
+/* Floating elements */
+.float-element{position:absolute;border-radius:16px;padding:14px 20px;font-size:12px;font-weight:600;backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);pointer-events:none;z-index:3}
+.float-1{background:rgba(0,212,255,0.08);color:var(--accent);top:-20px;right:-30px;box-shadow:0 8px 32px rgba(0,212,255,0.15)}
+.float-2{background:rgba(0,255,136,0.08);color:var(--accent2);bottom:-15px;left:-25px;box-shadow:0 8px 32px rgba(0,255,136,0.15)}
+.float-3{background:rgba(168,85,247,0.08);color:var(--accent3);top:40%;left:-40px;box-shadow:0 8px 32px rgba(168,85,247,0.15)}
+
+/* Icon grid */
+.icon-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px}
+.icon-item{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;transition:all 0.3s cubic-bezier(0.16,1,0.3,1);cursor:default}
+.icon-item:hover{border-color:var(--accent);transform:translateX(4px);box-shadow:0 4px 20px var(--glow)}
+.icon-item svg{width:20px;height:20px;color:var(--accent);flex-shrink:0}
+.icon-item span{font-size:13px;color:var(--text2);font-weight:500}
+
+/* Divider sections */
+.divider-section{min-height:60vh;display:flex;align-items:center;justify-content:center;padding:80px 40px;position:relative;z-index:2}
+.divider-content{text-align:center;max-width:800px}
+.divider-num{font-family:var(--font-head);font-size:clamp(80px,15vw,200px);font-weight:800;background:var(--grad1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;opacity:0.15;line-height:1}
+.divider-text{font-family:var(--font-head);font-size:clamp(24px,4vw,48px);font-weight:700;letter-spacing:-1px;margin-top:-40px;position:relative;z-index:2}
+
+/* Architecture section */
+.arch-section{padding:120px 40px;background:var(--bg2);position:relative;overflow:hidden;z-index:2}
+.arch-section::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent)}
+.arch-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;max-width:1200px;margin:0 auto}
+.arch-card{padding:32px 24px;background:var(--surface);border:1px solid var(--border);border-radius:20px;transition:all 0.5s cubic-bezier(0.16,1,0.3,1);position:relative;overflow:hidden;cursor:default}
+.arch-card::before{content:'';position:absolute;inset:0;background:var(--grad1);opacity:0;transition:opacity 0.5s}
+.arch-card:hover{transform:translateY(-8px);border-color:var(--accent);box-shadow:0 24px 64px rgba(0,212,255,0.15)}
+.arch-card:hover::before{opacity:0.05}
+.arch-card-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:20px;position:relative;z-index:1}
+.arch-card-icon svg{width:24px;height:24px}
+.arch-card-title{font-family:var(--font-head);font-size:18px;font-weight:700;margin-bottom:8px;position:relative;z-index:1}
+.arch-card-desc{font-size:13px;color:var(--text2);line-height:1.6;position:relative;z-index:1}
+
+/* Tool grid section */
+.tools-section{padding:120px 40px;position:relative;z-index:2}
+.tools-header{text-align:center;margin-bottom:64px}
+.tools-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1200px;margin:0 auto}
+.tool-card{padding:32px;background:var(--surface);border:1px solid var(--border);border-radius:20px;transition:all 0.4s cubic-bezier(0.16,1,0.3,1);position:relative;overflow:hidden;cursor:default}
+.tool-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--grad1);transform:scaleX(0);transform-origin:left;transition:transform 0.5s cubic-bezier(0.16,1,0.3,1)}
+.tool-card:hover{transform:translateY(-6px);border-color:var(--border2);box-shadow:0 20px 50px rgba(0,0,0,0.4)}
+.tool-card:hover::after{transform:scaleX(1)}
+.tool-icon{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;margin-bottom:20px;font-size:28px}
+.tool-title{font-family:var(--font-head);font-size:18px;font-weight:700;margin-bottom:10px}
+.tool-desc{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:16px}
+.tool-tags{display:flex;flex-wrap:wrap;gap:6px}
+.tool-tag{padding:4px 10px;border-radius:6px;font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase}
+
+/* CTA / Final section */
+.cta-section{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:120px 40px;text-align:center;position:relative;z-index:2}
+.cta-glow{position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(0,212,255,0.08),transparent 70%);pointer-events:none}
+.cta-title{font-family:var(--font-head);font-size:clamp(40px,6vw,80px);font-weight:700;line-height:1;letter-spacing:-2px;margin-bottom:24px}
+.cta-sub{font-size:18px;color:var(--text2);max-width:560px;margin:0 auto 48px;line-height:1.7}
+.cta-buttons{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+
+/* Horizontal scroll section — non-pinned */
+.horizontal-section{padding:100px 0;overflow:hidden;position:relative;z-index:2}
+.horizontal-section::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent)}
+.horizontal-section::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent)}
+.horizontal-track{display:flex;gap:32px;padding:40px 40px 40px 40px;will-change:transform}
+.h-card{flex:0 0 360px;min-height:420px;background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:36px;display:flex;flex-direction:column;transition:all 0.4s cubic-bezier(0.16,1,0.3,1);position:relative;overflow:hidden}
+.h-card::before{content:'';position:absolute;inset:0;background:var(--grad1);opacity:0;transition:opacity 0.4s}
+.h-card:hover{border-color:var(--accent);transform:translateY(-8px) scale(1.02);box-shadow:0 32px 64px rgba(0,0,0,0.4)}
+.h-card:hover::before{opacity:0.05}
+.h-card-num{font-family:var(--font-head);font-size:64px;font-weight:800;background:var(--grad1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;opacity:0.2;line-height:1}
+.h-card-icon{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:16px 0;position:relative;z-index:1}
+.h-card-title{font-family:var(--font-head);font-size:22px;font-weight:700;margin-bottom:12px;position:relative;z-index:1}
+.h-card-desc{font-size:14px;color:var(--text2);line-height:1.7;position:relative;z-index:1;flex:1}
+.h-card-tag{display:inline-flex;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:600;margin-top:20px;width:fit-content;position:relative;z-index:1}
+.horizontal-header{text-align:center;padding:0 40px 40px}
+
+/* Particle field */
+.particle-field{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.particle{position:absolute;width:3px;height:3px;border-radius:50%;background:var(--accent);opacity:0}
+
+/* Reveal animations — initial state set by GSAP, not CSS */
+
+/* Feature list inline */
+.feature-list{display:flex;flex-direction:column;gap:12px;margin-top:24px}
+.feature-list-item{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--text2)}
+.feature-list-item .check{width:20px;height:20px;border-radius:6px;background:rgba(0,255,136,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.feature-list-item .check svg{width:12px;height:12px;color:var(--accent2)}
+
+/* Tech stack badges */
+.tech-badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+.tech-badge{padding:6px 14px;border-radius:8px;font-size:11px;font-weight:600;font-family:var(--font-mono);background:var(--surface);border:1px solid var(--border);color:var(--text2);transition:all 0.3s;cursor:default}
+.tech-badge:hover{border-color:var(--accent);color:var(--accent)}
+
+/* Footer */
+#footer{padding:60px 40px;border-top:1px solid var(--border);text-align:center;color:var(--text3);font-size:13px}
+#footer a{color:var(--accent);text-decoration:none}
+
+/* Responsive */
+@media(max-width:1024px){
+  .feature-grid{grid-template-columns:1fr;gap:48px}
+  .feature-grid.reverse{direction:ltr}
+  .arch-grid{grid-template-columns:repeat(2,1fr)}
+  .tools-grid{grid-template-columns:repeat(2,1fr)}
+  .feature-stats{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:768px){
+  section{padding:80px 20px}
+  .feature-section{padding:80px 20px}
+  .arch-grid,.tools-grid{grid-template-columns:1fr}
+  .nav-links{display:none}
+  .feature-stats{grid-template-columns:1fr}
+  .icon-grid{grid-template-columns:1fr}
+}
+
+/* Reduced motion */
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:0.01ms !important;transition-duration:0.01ms !important}
+  .reveal,.reveal-left,.reveal-right,.reveal-scale,.reveal-rotate{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<div id="scroll-progress"></div>
+<canvas id="three-canvas"></canvas>
+
+<nav id="nav">
+  <a class="nav-logo" href="#">
+    <div class="nav-logo-icon">EQ</div>
+    <span class="nav-logo-text">Savvy</span>
+  </a>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#tools">Tools</a>
+    <a href="#tech">Tech Stack</a>
+    <a href="#cta">Get Started</a>
+  </div>
+</nav>
+
+<!-- ====== HERO ====== -->
+<section class="hero" id="hero">
+  <div class="hero-badge"><span class="dot"></span> Oracle HCM AI Desktop Overlay</div>
+  <h1 class="hero-title">
+    <span class="line"><span class="gradient">EQInt Savvy</span></span>
+    <span class="line"><span class="outline">Your Oracle</span></span>
+    <span class="line"><span class="outline">Copilot</span></span>
+  </h1>
+  <p class="hero-sub">A frameless, always-on-top Electron overlay that reads your Oracle Fusion HCM pages via OCR, answers questions with a local LLM, runs payroll reconciliation across 4 modes, generates BIP reports, tracks 15 analytics dimensions, and executes 30+ HCM commands — all from your desktop. Zero cloud dependency for core features.</p>
+  <div class="hero-cta">
+    <button class="btn-primary" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      Explore Features
+    </button>
+    <a class="btn-outline" href="#tech">Tech Stack</a>
+  </div>
+  <div class="scroll-indicator">
+    <div class="scroll-line"></div>
+    SCROLL
+  </div>
+</section>
+
+<!-- ====== DIVIDER: THE PROBLEM ====== -->
+<div class="divider-section">
+  <div class="divider-content">
+    <div class="divider-num reveal">01</div>
+    <div class="divider-text reveal">Oracle HCM is powerful.<br>But navigating it is a nightmare.</div>
+  </div>
+</div>
+
+<!-- ====== FEATURE: AI CHAT ====== -->
+<section class="feature-section" id="features">
+  <div class="section-inner">
+    <div class="feature-grid">
+      <div class="feature-content">
+        <div class="feature-label reveal">AI Chat Engine</div>
+        <h2 class="feature-title reveal">Ask Anything.<br>Get Answers.</h2>
+        <p class="feature-desc reveal">Savvy connects to a local LLM via Ollama (phi3:mini default) or streams from a cloud backend. The chat engine processes 30+ natural language commands locally — clock in/out, create absences, fetch payslips, search employees, manage emails — without hitting the AI backend. Unrecognized queries fall through to the LLM with full Oracle context. Word-by-word streaming with abort control, 180s timeout with automatic local fallback, and conversation history persisted across sessions.</p>
+        <div class="feature-stats">
+          <div class="stat-card reveal"><div class="stat-num">30+</div><div class="stat-label">Local Commands</div></div>
+          <div class="stat-card reveal"><div class="stat-num">Local</div><div class="stat-label">LLM Inference</div></div>
+          <div class="stat-card reveal"><div class="stat-num">100%</div><div class="stat-label">Private</div></div>
+        </div>
+        <div class="feature-list">
+          <div class="feature-list-item reveal"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div> Local command processing (30+ HCM actions)</div>
+          <div class="feature-list-item reveal"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div> Voice I/O via Web Speech API + Azure TTS</div>
+          <div class="feature-list-item reveal"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div> OCR Page Reader — reads Oracle screens</div>
+          <div class="feature-list-item reveal"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div> Streaming responses + stop/abort control</div>
+          <div class="feature-list-item reveal"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div> Reconciliation chat assistant with session state</div>
+        </div>
+      </div>
+      <div class="feature-visual reveal-scale">
+        <div class="float-element float-1">Connected to Oracle Cloud</div>
+        <div class="float-element float-2">phi3:mini loaded</div>
+        <div class="mockup-frame">
+          <div class="mockup-titlebar">
+            <div class="mockup-dot"></div><div class="mockup-dot"></div><div class="mockup-dot"></div>
+            <div class="mockup-title">Savvy — AI Chat</div>
+          </div>
+          <div class="mockup-body">
+            <div style="display:flex;gap:8px;margin-bottom:16px">
+              <div style="width:28px;height:28px;border-radius:8px;background:var(--grad1);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#000;flex-shrink:0">EQ</div>
+              <div style="padding:10px 14px;background:var(--surface);border-radius:10px;border-bottom-left-radius:3px;font-size:13px;color:var(--text2);max-width:80%">Hi! I can see your Oracle page and help you navigate. Ask me anything.</div>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:16px;flex-direction:row-reverse">
+              <div style="width:28px;height:28px;border-radius:8px;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:var(--text);flex-shrink:0">U</div>
+              <div style="padding:10px 14px;background:rgba(0,212,255,0.1);border-radius:10px;border-bottom-right-radius:3px;font-size:13px;color:var(--accent);max-width:80%">Show my absences this month</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <div style="width:28px;height:28px;border-radius:8px;background:var(--grad1);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#000;flex-shrink:0">EQ</div>
+              <div style="padding:10px 14px;background:var(--surface);border-radius:10px;border-bottom-left-radius:3px;font-size:13px;color:var(--text2);max-width:80%">
+                <div style="font-weight:600;color:var(--accent);margin-bottom:4px">Absence Summary — 3 Records</div>
+                <div style="font-size:12px;line-height:1.6">
+                  1. Annual Leave — 5 days — <span style="color:var(--accent2)">Approved</span><br>
+                  2. Sick Leave — 2 days — <span style="color:var(--accent4)">Pending</span><br>
+                  3. Personal Day — 1 day — <span style="color:var(--accent2)">Approved</span>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:20px;display:flex;gap:6px;flex-wrap:wrap">
+              <div style="padding:5px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:10px;color:var(--text3)">Absences</div>
+              <div style="padding:5px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:10px;color:var(--text3)">Clock In</div>
+              <div style="padding:5px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:10px;color:var(--text3)">Payroll</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== DIVIDER 2 ====== -->
+<div class="divider-section">
+  <div class="divider-content">
+    <div class="divider-num reveal">02</div>
+    <div class="divider-text reveal">See everything.<br>Understand instantly.</div>
+  </div>
+</div>
+
+<!-- ====== FEATURE: DASHBOARD ====== -->
+<section class="feature-section">
+  <div class="section-inner">
+    <div class="feature-grid reverse">
+      <div class="feature-content">
+        <div class="feature-label reveal">HCM Dashboard</div>
+        <h2 class="feature-title reveal">Live Oracle<br>at a Glance</h2>
+        <p class="feature-desc reveal">Real-time workforce metrics pulled directly from Oracle Fusion HCM REST APIs. Chart.js-powered visualizations render headcount breakdowns, absence trends, payroll element distributions, department hierarchies, location maps, and organization structures. Every chart refreshes on-demand with live API data — no cached snapshots. The dashboard fetches workers, absences, payroll relationships, organizations, locations, grades, jobs, and legal entities in parallel for sub-second load times.</p>
+        <div class="feature-stats">
+          <div class="stat-card reveal"><div class="stat-num">8</div><div class="stat-label">Oracle APIs</div></div>
+          <div class="stat-card reveal"><div class="stat-num">6</div><div class="stat-label">Chart Types</div></div>
+          <div class="stat-card reveal"><div class="stat-num">Live</div><div class="stat-label">Refresh Rate</div></div>
+        </div>
+        <div class="icon-grid">
+          <div class="icon-item reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Worker Profiles with expand/flatten</span></div>
+          <div class="icon-item reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Absence tracking + leave summary</span></div>
+          <div class="icon-item reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>Payroll elements + salary breakdown</span></div>
+          <div class="icon-item reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg><span>Org hierarchy + departments + locations</span></div>
+        </div>
+      </div>
+      <div class="feature-visual reveal-scale">
+        <div class="mockup-frame">
+          <div class="mockup-titlebar">
+            <div class="mockup-dot"></div><div class="mockup-dot"></div><div class="mockup-dot"></div>
+            <div class="mockup-title">Savvy — Dashboard</div>
+          </div>
+          <div class="mockup-body" style="padding:16px">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+              <div style="padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;text-align:center">
+                <div style="font-size:20px;font-weight:800;font-family:var(--font-head);background:var(--grad1);-webkit-background-clip:text;-webkit-text-fill-color:transparent">247</div>
+                <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Employees</div>
+              </div>
+              <div style="padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;text-align:center">
+                <div style="font-size:20px;font-weight:800;font-family:var(--font-head);color:var(--accent2)">18</div>
+                <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Departments</div>
+              </div>
+              <div style="padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;text-align:center">
+                <div style="font-size:20px;font-weight:800;font-family:var(--font-head);color:var(--accent3)">12</div>
+                <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Locations</div>
+              </div>
+              <div style="padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;text-align:center">
+                <div style="font-size:20px;font-weight:800;font-family:var(--font-head);color:var(--accent4)">34</div>
+                <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Absences</div>
+              </div>
+            </div>
+            <!-- Mini chart mock -->
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+              <div style="font-size:11px;color:var(--text3);font-weight:600;margin-bottom:12px">Headcount by Department</div>
+              <div style="display:flex;align-items:end;gap:6px;height:80px">
+                <div style="flex:1;background:var(--grad1);border-radius:4px 4px 0 0;height:60%;opacity:0.7"></div>
+                <div style="flex:1;background:var(--grad1);border-radius:4px 4px 0 0;height:80%;opacity:0.8"></div>
+                <div style="flex:1;background:var(--grad1);border-radius:4px 4px 0 0;height:45%;opacity:0.6"></div>
+                <div style="flex:1;background:var(--grad1);border-radius:4px 4px 0 0;height:90%;opacity:0.9"></div>
+                <div style="flex:1;background:var(--grad1);border-radius:4px 4px 0 0;height:70%;opacity:0.7"></div>
+                <div style="flex:1;background:var(--grad1);border-radius:4px 4px 0 0;height:55%;opacity:0.6"></div>
+                <div style="flex:1;background:var(--grad1);border-radius:4px 4px 0 0;height:85%;opacity:0.85"></div>
+                <div style="flex:1;background:var(--grad1);border-radius:4px 4px 0 0;height:40%;opacity:0.5"></div>
+              </div>
+            </div>
+            <!-- Table mock -->
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px">
+              <div style="font-size:11px;color:var(--text3);font-weight:600;margin-bottom:8px">Recent Employees</div>
+              <div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px">
+                <span style="color:var(--accent);font-weight:600;flex:1">EMP-2847</span>
+                <span style="color:var(--text2);flex:2">Engineering</span>
+                <span style="color:var(--accent2);font-size:10px">ACTIVE</span>
+              </div>
+              <div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px">
+                <span style="color:var(--accent);font-weight:600;flex:1">EMP-2846</span>
+                <span style="color:var(--text2);flex:2">HR</span>
+                <span style="color:var(--accent2);font-size:10px">ACTIVE</span>
+              </div>
+              <div style="display:flex;gap:8px;padding:6px 0;font-size:11px">
+                <span style="color:var(--accent);font-weight:600;flex:1">EMP-2845</span>
+                <span style="color:var(--text2);flex:2">Finance</span>
+                <span style="color:var(--accent4);font-size:10px">PENDING</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== DIVIDER 3 ====== -->
+<div class="divider-section">
+  <div class="divider-content">
+    <div class="divider-num reveal">03</div>
+    <div class="divider-text reveal">15 analytics tabs.<br>Zero guesswork.</div>
+  </div>
+</div>
+
+<!-- ====== FEATURE: ANALYTICS ====== -->
+<section class="feature-section">
+  <div class="section-inner">
+    <div class="feature-grid">
+      <div class="feature-content">
+        <div class="feature-label reveal">Analytics Dashboard</div>
+        <h2 class="feature-title reveal">Deep Dive<br>Into Data</h2>
+        <p class="feature-desc reveal">Fifteen dedicated analytics tabs pulling live data from Oracle Analytics Cloud. Each tab maps to a specific HCM domain: Summary (KPIs), Workforce (headcount by dept/grade/gender), Trends (hire/termination velocity), Absences (type breakdown + trends), Payroll (element distributions), Recruiting (pipeline funnel), Performance (rating distributions), Diversity (gender/age/nationality), Compensation (salary bands + peer percentiles), Turnover (rate by department + tenure), Directory (searchable employee list), Locations (headcount by site), Organizations (entity hierarchy), Grades (grade distribution), and Jobs (title popularity). All 15 tabs fetch in parallel via async/await with individual loading states.</p>
+        <div class="feature-stats">
+          <div class="stat-card reveal"><div class="stat-num">15</div><div class="stat-label">Analytics Tabs</div></div>
+          <div class="stat-card reveal"><div class="stat-num">13</div><div class="stat-label">Oracle REST APIs</div></div>
+          <div class="stat-card reveal"><div class="stat-num">Async</div><div class="stat-label">Parallel Fetch</div></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:20px">
+          <span class="tech-badge reveal" style="background:rgba(0,212,255,0.08);border-color:rgba(0,212,255,0.2);color:var(--accent)">Summary</span>
+          <span class="tech-badge reveal" style="background:rgba(0,255,136,0.08);border-color:rgba(0,255,136,0.2);color:var(--accent2)">Workforce</span>
+          <span class="tech-badge reveal" style="background:rgba(168,85,247,0.08);border-color:rgba(168,85,247,0.2);color:var(--accent3)">Trends</span>
+          <span class="tech-badge reveal" style="background:rgba(249,115,22,0.08);border-color:rgba(249,115,22,0.2);color:var(--accent4)">Absences</span>
+          <span class="tech-badge reveal" style="background:rgba(0,212,255,0.08);border-color:rgba(0,212,255,0.2);color:var(--accent)">Payroll</span>
+          <span class="tech-badge reveal" style="background:rgba(0,255,136,0.08);border-color:rgba(0,255,136,0.2);color:var(--accent2)">Recruiting</span>
+          <span class="tech-badge reveal" style="background:rgba(168,85,247,0.08);border-color:rgba(168,85,247,0.2);color:var(--accent3)">Performance</span>
+          <span class="tech-badge reveal" style="background:rgba(249,115,22,0.08);border-color:rgba(249,115,22,0.2);color:var(--accent4)">Diversity</span>
+          <span class="tech-badge reveal" style="background:rgba(0,212,255,0.08);border-color:rgba(0,212,255,0.2);color:var(--accent)">Compensation</span>
+          <span class="tech-badge reveal" style="background:rgba(0,255,136,0.08);border-color:rgba(0,255,136,0.2);color:var(--accent2)">Turnover</span>
+          <span class="tech-badge reveal" style="background:rgba(168,85,247,0.08);border-color:rgba(168,85,247,0.2);color:var(--accent3)">Directory</span>
+          <span class="tech-badge reveal" style="background:rgba(249,115,22,0.08);border-color:rgba(249,115,22,0.2);color:var(--accent4)">Locations</span>
+          <span class="tech-badge reveal" style="background:rgba(0,212,255,0.08);border-color:rgba(0,212,255,0.2);color:var(--accent)">Orgs</span>
+          <span class="tech-badge reveal" style="background:rgba(0,255,136,0.08);border-color:rgba(0,255,136,0.2);color:var(--accent2)">Grades</span>
+          <span class="tech-badge reveal" style="background:rgba(168,85,247,0.08);border-color:rgba(168,85,247,0.2);color:var(--accent3)">Jobs</span>
+        </div>
+      </div>
+      <div class="feature-visual reveal-scale">
+        <div class="float-element float-3">Parallel API Fetch</div>
+        <div class="mockup-frame">
+          <div class="mockup-titlebar">
+            <div class="mockup-dot"></div><div class="mockup-dot"></div><div class="mockup-dot"></div>
+            <div class="mockup-title">Savvy — Analytics</div>
+          </div>
+          <div class="mockup-body" style="padding:12px">
+            <div style="display:flex;gap:4px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px">
+              <div style="padding:6px 12px;border-radius:6px;font-size:10px;font-weight:600;background:rgba(0,212,255,0.15);color:var(--accent);white-space:nowrap">Summary</div>
+              <div style="padding:6px 12px;border-radius:6px;font-size:10px;font-weight:600;color:var(--text3);white-space:nowrap">Workforce</div>
+              <div style="padding:6px 12px;border-radius:6px;font-size:10px;font-weight:600;color:var(--text3);white-space:nowrap">Trends</div>
+              <div style="padding:6px 12px;border-radius:6px;font-size:10px;font-weight:600;color:var(--text3);white-space:nowrap">Absences</div>
+              <div style="padding:6px 12px;border-radius:6px;font-size:10px;font-weight:600;color:var(--text3);white-space:nowrap">Payroll</div>
+              <div style="padding:6px 12px;border-radius:6px;font-size:10px;font-weight:600;color:var(--text3);white-space:nowrap">...</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px">
+              <div style="padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;text-align:center">
+                <div style="font-size:22px;font-weight:800;font-family:var(--font-head);color:var(--text)">247</div>
+                <div style="font-size:9px;color:var(--text3)">Total Employees</div>
+              </div>
+              <div style="padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;text-align:center">
+                <div style="font-size:22px;font-weight:800;font-family:var(--font-head);color:var(--accent2)">3.2%</div>
+                <div style="font-size:9px;color:var(--text3)">Turnover Rate</div>
+              </div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px">
+              <div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:8px">Gender Distribution</div>
+              <div style="display:flex;gap:4px;height:8px;border-radius:4px;overflow:hidden">
+                <div style="flex:55;background:var(--accent);border-radius:4px"></div>
+                <div style="flex:42;background:var(--accent3);border-radius:4px"></div>
+                <div style="flex:3;background:var(--accent4);border-radius:4px"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:9px;color:var(--text3)">
+                <span>Male 55%</span><span>Female 42%</span><span>Other 3%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== DIVIDER 4 ====== -->
+<div class="divider-section">
+  <div class="divider-content">
+    <div class="divider-num reveal">04</div>
+    <div class="divider-text reveal">Policy-driven.<br>Automated reconciliation.</div>
+  </div>
+</div>
+
+<!-- ====== FEATURE: RECONCILIATION ====== -->
+<section class="feature-section">
+  <div class="section-inner">
+    <div class="feature-grid reverse">
+      <div class="feature-content">
+        <div class="feature-label reveal">Payroll Reconciliation</div>
+        <h2 class="feature-title reveal">Policy Rules<br>Meet Oracle Data</h2>
+        <p class="feature-desc reveal">Four reconciliation modes powered by a Python backend engine. Upload Excel files (Activity/Register + Costing) for offline comparison, or connect live to Oracle BIP to fetch Element Result and Costing Detail reports automatically. The Live Flow Reconciliation resolves payroll flows by name, fetches reports in real-time, and builds a verified Excel workbook with matched/mismatched lines. BIP Catalog Recon browses your Oracle BIP folders, lets you pick reports, and reconciles by date range. Oracle Recon discovers available payroll periods, lists flows, and reconciles on selection. Natural language policy rules (parsed via LLM) define tolerance thresholds per element — "tolerance of 0.01 for Basic Salary" — and flag violations automatically. The recon chat assistant maintains session state for follow-up commands like "show variances", "fix mismatch", or "download excel".</p>
+        <div class="feature-stats">
+          <div class="stat-card reveal"><div class="stat-num">4</div><div class="stat-label">Recon Modes</div></div>
+          <div class="stat-card reveal"><div class="stat-num">NL</div><div class="stat-label">Policy Rules</div></div>
+          <div class="stat-card reveal"><div class="stat-num">.xlsx</div><div class="stat-label">Excel Export</div></div>
+        </div>
+        <div class="feature-list">
+          <div class="feature-list-item reveal"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div> Excel Recon — upload Source + Costing files</div>
+          <div class="feature-list-item reveal"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div> Live Flow Recon — real-time Oracle BIP fetch</div>
+          <div class="feature-list-item reveal"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div> BIP Catalog Recon — browse + select reports</div>
+          <div class="feature-list-item reveal"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div> Oracle Recon — discover periods + reconcile</div>
+          <div class="feature-list-item reveal"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div> Policy rule parsing via LLM with tolerance thresholds</div>
+        </div>
+      </div>
+      <div class="feature-visual reveal-scale">
+        <div class="mockup-frame">
+          <div class="mockup-titlebar">
+            <div class="mockup-dot"></div><div class="mockup-dot"></div><div class="mockup-dot"></div>
+            <div class="mockup-title">Savvy — Payroll Recon</div>
+          </div>
+          <div class="mockup-body" style="padding:16px">
+            <div style="padding:12px;background:rgba(0,255,136,0.05);border:1px solid rgba(0,255,136,0.2);border-radius:10px;margin-bottom:12px">
+              <div style="font-size:11px;font-weight:600;color:var(--accent2);margin-bottom:6px">Active Policy: Vitatech UAE Policy</div>
+              <div style="font-size:10px;color:var(--text3)">4 rules parsed</div>
+            </div>
+            <div style="font-size:11px;color:var(--text3);font-weight:600;margin-bottom:8px">Reconciliation Results</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+              <div style="padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;text-align:center">
+                <div style="font-size:18px;font-weight:800;color:var(--text)">142</div>
+                <div style="font-size:8px;color:var(--text3)">TOTAL</div>
+              </div>
+              <div style="padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;text-align:center">
+                <div style="font-size:18px;font-weight:800;color:var(--accent2)">128</div>
+                <div style="font-size:8px;color:var(--text3)">MATCHED</div>
+              </div>
+              <div style="padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;text-align:center">
+                <div style="font-size:18px;font-weight:800;color:var(--accent4)">14</div>
+                <div style="font-size:8px;color:var(--text3)">MISMATCH</div>
+              </div>
+            </div>
+            <div style="font-size:10px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-bottom:4px;display:flex;justify-content:space-between">
+              <span>EMP-1023 — Basic Salary</span>
+              <span style="color:var(--accent2);font-weight:600">MATCH</span>
+            </div>
+            <div style="font-size:10px;padding:6px 10px;background:rgba(249,115,22,0.05);border:1px solid rgba(249,115,22,0.2);border-radius:6px;margin-bottom:4px;display:flex;justify-content:space-between">
+              <span>EMP-1047 — Housing Allow.</span>
+              <span style="color:var(--accent4);font-weight:600">VARIANCE 2.3%</span>
+            </div>
+            <div style="font-size:10px;padding:6px 10px;background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:6px;display:flex;justify-content:space-between">
+              <span>EMP-1102 — Gratuity</span>
+              <span style="color:#ef4444;font-weight:600">POLICY VIOLATION</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== DIVIDER 5 ====== -->
+<div class="divider-section">
+  <div class="divider-content">
+    <div class="divider-num reveal">05</div>
+    <div class="divider-text reveal">Reports. Screens. Policies.<br>All tools in one overlay.</div>
+  </div>
+</div>
+
+<!-- ====== HORIZONTAL SCROLL: TOOLS ====== -->
+<div class="horizontal-section" id="tools">
+  <div class="horizontal-header">
+    <div class="feature-label reveal" style="justify-content:center">Built-in Tools</div>
+    <h2 class="feature-title reveal" style="text-align:center">Every Tool,<br>One Overlay</h2>
+  </div>
+  <div class="horizontal-track">
+      <div class="h-card">
+        <div class="h-card-num">01</div>
+        <div class="h-card-icon" style="background:rgba(0,212,255,0.1)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15h6"/></svg>
+        </div>
+        <div class="h-card-title">BIP Reports</div>
+        <div class="h-card-desc">Browse, generate, and export BI Publisher reports directly from the overlay. A local TypeScript BIP server (port 3000) proxies Oracle BI Publisher SOAP/REST calls. The main process spawns it via npx tsx, and the renderer fetches report catalogs, binds parameters, and downloads XML/PDF/Excel outputs. Supports both standard and custom report folders with automatic folder discovery.</div>
+        <div class="h-card-tag" style="background:rgba(0,212,255,0.08);color:var(--accent)">TypeScript + SOAP/REST</div>
+      </div>
+      <div class="h-card">
+        <div class="h-card-num">02</div>
+        <div class="h-card-icon" style="background:rgba(0,255,136,0.1)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <div class="h-card-title">Page Reader (OCR)</div>
+        <div class="h-card-desc">Captures your active Oracle Fusion screen using Electron's desktopCapturer API, runs Tesseract.js OCR with eng.traineddata, and feeds the extracted text to the AI chat. The page reader detects the foreground window, captures a screenshot, processes it through the OCR pipeline, and injects the result as chat context — letting Savvy "see" what's on your screen without manual input. Supports multi-monitor capture.</div>
+        <div class="h-card-tag" style="background:rgba(0,255,136,0.08);color:var(--accent2)">Tesseract.js + desktopCapturer</div>
+      </div>
+      <div class="h-card">
+        <div class="h-card-num">03</div>
+        <div class="h-card-icon" style="background:rgba(168,85,247,0.1)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div class="h-card-title">Local Auth Security</div>
+        <div class="h-card-desc">Every installation generates a unique 32-byte pairing token stored in userData with 0o600 permissions. The backend's LocalTokenMiddleware validates X-Local-Token headers on every request, ensuring only this specific desktop app instance can communicate with the local API server. Tokens are persisted via crypto.randomBytes and survive app restarts. On Windows, SafeStorage encrypts via DPAPI; on macOS via Keychain.</div>
+        <div class="h-card-tag" style="background:rgba(168,85,247,0.08);color:var(--accent3)">Crypto + DPAPI/Keychain</div>
+      </div>
+      <div class="h-card">
+        <div class="h-card-num">04</div>
+        <div class="h-card-icon" style="background:rgba(249,115,22,0.1)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent4)" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        </div>
+        <div class="h-card-title">SSO / OpenID Connect</div>
+        <div class="h-card-desc">Enterprise SSO login via OpenID Connect (openid-client library). Implements the PKCE (Proof Key for Code Exchange) flow for secure authorization without client secrets. Supports tenant-based configuration via policy-config.js, automatic token refresh before expiry, and integration with Oracle Identity Cloud Service. Tokens are stored in the OS keychain via keytar for zero-plaintext persistence.</div>
+        <div class="h-card-tag" style="background:rgba(249,115,22,0.08);color:var(--accent4)">OIDC + PKCE + keytar</div>
+      </div>
+      <div class="h-card">
+        <div class="h-card-num">05</div>
+        <div class="h-card-icon" style="background:rgba(0,212,255,0.1)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </div>
+        <div class="h-card-title">Cursor Awareness</div>
+        <div class="h-card-desc">Real-time cursor position tracking via Electron's screen API. The describeCursorRegion module divides the screen into a 3x3 grid and detects which region you're hovering over, providing context-aware suggestions based on where your cursor is on the Oracle page. Uses screen.getCursorScreenPoint() for precise coordinates across multi-monitor setups. The overlay window follows the cursor region for optimal positioning.</div>
+        <div class="h-card-tag" style="background:rgba(0,212,255,0.08);color:var(--accent)">3x3 Grid + Multi-Monitor</div>
+      </div>
+      <div class="h-card">
+        <div class="h-card-num">06</div>
+        <div class="h-card-icon" style="background:rgba(0,255,136,0.1)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <div class="h-card-title">Auto-Update</div>
+        <div class="h-card-desc">Built-in auto-updater via electron-updater with NSIS installer and portable build targets. Checks a generic update server on launch, shows native desktop notifications for available updates, supports delta downloads, and handles both Windows installer (.exe) and portable executables. The afterSign hook handles macOS notarization with entitlements for hardened runtime. Build pipeline via electron-builder with code signing.</div>
+        <div class="h-card-tag" style="background:rgba(0,255,136,0.08);color:var(--accent2)">electron-updater + NSIS</div>
+      </div>
+      <div class="h-card">
+        <div class="h-card-num">07</div>
+        <div class="h-card-icon" style="background:rgba(168,85,247,0.1)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        </div>
+        <div class="h-card-title">Bubble Mode</div>
+        <div class="h-card-desc">Collapse the entire overlay into a floating 80x80px moon icon with CSS-animated clouds and sparkles. The bubble uses backdrop-filter blur, gradient backgrounds, and keyframe animations for the glow effect. Click to expand back to full overlay. The bubble sits at the screen corner with always-on-top positioning, consuming zero screen real estate while remaining instantly accessible. State is preserved across collapse/expand cycles.</div>
+        <div class="h-card-tag" style="background:rgba(168,85,247,0.08);color:var(--accent3)">CSS Animations + State Preservation</div>
+      </div>
+      <div class="h-card">
+        <div class="h-card-num">08</div>
+        <div class="h-card-icon" style="background:rgba(249,115,22,0.1)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent4)" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </div>
+        <div class="h-card-title">Voice I/O</div>
+        <div class="h-card-desc">Dual voice system: Web Speech API for browser-native ASR (speech recognition) and TTS (text-to-speech), with API-powered fallback via Azure Neural TTS (en-US-AvaNeural default). Voice selection with configurable rate/pitch/volume. Sentence-by-sentence streaming for natural pauses. The voice toggle persists across sessions. Supports hands-free queries — speak your HCM question and get an audio response.</div>
+        <div class="h-card-tag" style="background:rgba(249,115,22,0.08);color:var(--accent4)">Web Speech + Azure Neural TTS</div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== ARCHITECTURE SECTION ====== -->
+<section class="arch-section" id="architecture">
+  <div class="section-inner">
+    <div style="text-align:center;margin-bottom:64px">
+      <div class="feature-label reveal" style="justify-content:center">Architecture</div>
+      <h2 class="feature-title reveal" style="text-align:center">Built on Three Layers</h2>
+      <p class="feature-desc reveal" style="text-align:center;max-width:600px;margin:0 auto">Electron main process, preload bridge, and renderer — each isolated, each secure. The Python backend handles Oracle communication while TypeScript servers power BIP and dashboards. Every process is spawned, monitored, and killed independently.</p>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-card reveal">
+        <div class="arch-card-icon" style="background:rgba(0,212,255,0.1)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <div class="arch-card-title">Main Process</div>
+        <div class="arch-card-desc">Electron main: window management (frameless, always-on-top, resizable overlay), system tray with context menu, IPC handlers for file dialogs/native dialogs, backend server spawning (Python uvicorn on port 8080), BIP server (TypeScript on port 3000), dashboard server (port 3001). Handles auto-updater, screen capture, secure storage (keytar + safeStorage), SSO auth (OpenID Connect PKCE), policy config loading (platform-specific paths), cursor region detection, and telemetry with PII scrubbing.</div>
+      </div>
+      <div class="arch-card reveal">
+        <div class="arch-card-icon" style="background:rgba(0,255,136,0.1)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div class="arch-card-title">Preload Bridge</div>
+        <div class="arch-card-desc">Context-isolated bridge via contextBridge.exposeInMainWorld. Exposes window.electronAPI (file I/O, dialogs, clipboard, shell) and window.savvy APIs (HCM endpoints, settings). Sandbox: true, nodeIntegration: false, contextIsolation: true. No direct DOM access from renderer. All IPC is serialized — no shared memory between main and renderer processes.</div>
+      </div>
+      <div class="arch-card reveal">
+        <div class="arch-card-icon" style="background:rgba(168,85,247,0.1)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        </div>
+        <div class="arch-card-title">Renderer (UI)</div>
+        <div class="arch-card-desc">overlay.html + app.js + renderer modules. Chat engine with local command processing (30+ actions), streaming responses, abort control. Dashboard with Chart.js visualizations. 15 analytics tabs with parallel Oracle API fetch. Payroll reconciliation with 4 modes. BIP report browser. Settings page with Ollama/Oracle config. Bubble mode with CSS animations. Voice I/O via Web Speech API. Page reader via Tesseract.js OCR. Worker profile expansion/flatten logic. Person query parsing with self-reference detection.</div>
+      </div>
+      <div class="arch-card reveal">
+        <div class="arch-card-icon" style="background:rgba(249,115,22,0.1)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent4)" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        </div>
+        <div class="arch-card-title">Backend (Python)</div>
+        <div class="arch-card-desc">FastAPI + uvicorn on port 8080. Oracle HCM REST proxy with endpoint scoping (person-scoped vs reference-only paths). Analytics aggregation across 13+ endpoints. Policy rule parsing via Ollama LLM. Payroll reconciliation engine with Excel generation. Enhanced chat endpoint with context injection. Reconciliation chat with session state. Code execution sandbox. Voice synthesis API. Telemetry with PII field scrubbing. LocalTokenMiddleware for IPC security.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== TECH STACK SECTION ====== -->
+<section class="tools-section" id="tech">
+  <div class="section-inner">
+    <div class="tools-header">
+      <div class="feature-label reveal" style="justify-content:center">Tech Stack</div>
+      <h2 class="feature-title reveal" style="text-align:center">Every Technology,<br>Purpose-Built</h2>
+    </div>
+    <div class="tools-grid">
+      <div class="tool-card reveal">
+        <div class="tool-icon" style="background:rgba(0,212,255,0.1);color:var(--accent)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <div class="tool-title">Electron 44</div>
+        <div class="tool-desc">Desktop runtime with frameless transparent windows, always-on-top overlay, system tray integration, desktop screen capture (desktopCapturer), IPC via contextBridge, auto-updater (electron-updater), NSIS installer + portable builds, macOS notarization with hardened runtime entitlements. Window state persistence via electron-store.</div>
+        <div class="tool-tags">
+          <span class="tool-tag" style="background:rgba(0,212,255,0.08);color:var(--accent)">Desktop</span>
+          <span class="tool-tag" style="background:rgba(0,212,255,0.08);color:var(--accent)">Cross-Platform</span>
+        </div>
+      </div>
+      <div class="tool-card reveal">
+        <div class="tool-icon" style="background:rgba(0,255,136,0.1);color:var(--accent2)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+        <div class="tool-title">Python / FastAPI</div>
+        <div class="tool-desc">Backend API server on port 8080. Oracle HCM REST proxy with person-scoped vs reference-only endpoint classification. Analytics aggregation across 13+ Oracle endpoints. Policy rule parsing via Ollama LLM. Payroll reconciliation engine with Excel workbook generation. Enhanced chat with context injection. Reconciliation chat with session state. Code execution sandbox. Voice synthesis API. LocalTokenMiddleware for IPC security. PII field scrubbing in telemetry.</div>
+        <div class="tool-tags">
+          <span class="tool-tag" style="background:rgba(0,255,136,0.08);color:var(--accent2)">FastAPI</span>
+          <span class="tool-tag" style="background:rgba(0,255,136,0.08);color:var(--accent2)">Uvicorn</span>
+          <span class="tool-tag" style="background:rgba(0,255,136,0.08);color:var(--accent2)">REST Proxy</span>
+        </div>
+      </div>
+      <div class="tool-card reveal">
+        <div class="tool-icon" style="background:rgba(168,85,247,0.1);color:var(--accent3)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </div>
+        <div class="tool-title">Ollama + LLMs</div>
+        <div class="tool-desc">Local LLM inference via Ollama. Default model: phi3:mini (3.8B params). Powers AI chat responses, policy rule parsing for reconciliation, context-aware HCM queries, and the reconciliation chat assistant. Model version checking via checkModelVersion module. Configurable Ollama URL and model via settings page. Falls back to local command processing when LLM is unavailable.</div>
+        <div class="tool-tags">
+          <span class="tool-tag" style="background:rgba(168,85,247,0.08);color:var(--accent3)">Local LLM</span>
+          <span class="tool-tag" style="background:rgba(168,85,247,0.08);color:var(--accent3)">phi3:mini</span>
+        </div>
+      </div>
+      <div class="tool-card reveal">
+        <div class="tool-icon" style="background:rgba(249,115,22,0.1);color:var(--accent4)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        </div>
+        <div class="tool-title">Chart.js</div>
+        <div class="tool-desc">Dashboard visualizations with 6 chart types: bar (headcount by dept), line (trends over time), doughnut (absence type distribution), horizontal bar (grade distribution), stacked bar (organization types), and radar (performance metrics). Canvas-based rendering with responsive breakpoints. Used across dashboard page and all 15 analytics tabs.</div>
+        <div class="tool-tags">
+          <span class="tool-tag" style="background:rgba(249,115,22,0.08);color:var(--accent4)">Charts</span>
+          <span class="tool-tag" style="background:rgba(249,115,22,0.08);color:var(--accent4)">Canvas</span>
+        </div>
+      </div>
+      <div class="tool-card reveal">
+        <div class="tool-icon" style="background:rgba(0,212,255,0.1);color:var(--accent)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div class="tool-title">Keytar + SafeStorage</div>
+        <div class="tool-desc">OS-native credential storage. Keytar uses system keychain (macOS Keychain, Windows Credential Vault, Linux Secret Service) for Oracle passwords and SSO tokens. SafeStorage encrypts session tokens via Electron's safeStorage API (DPAPI on Windows, Keychain on macOS). Token store persists {sessionToken, ssoIdToken} under service "EQInt Savvy" with account "auth-tokens". Zero plaintext on disk.</div>
+        <div class="tool-tags">
+          <span class="tool-tag" style="background:rgba(0,212,255,0.08);color:var(--accent)">Security</span>
+          <span class="tool-tag" style="background:rgba(0,212,255,0.08);color:var(--accent)">Encrypted</span>
+        </div>
+      </div>
+      <div class="tool-card reveal">
+        <div class="tool-icon" style="background:rgba(0,255,136,0.1);color:var(--accent2)">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        </div>
+        <div class="tool-title">Electron Builder</div>
+        <div class="tool-desc">Build pipeline: NSIS installer (Windows), portable .exe, DMG (macOS). Code signing with certificates. afterSign hook for macOS notarization via notarize.js. Entitlements for hardened runtime. App ID: com.eqint.savvy-desktop. Auto-update server integration. Portable builds for air-gapped environments.</div>
+        <div class="tool-tags">
+          <span class="tool-tag" style="background:rgba(0,255,136,0.08);color:var(--accent2)">Build</span>
+          <span class="tool-tag" style="background:rgba(0,255,136,0.08);color:var(--accent2)">Notarize</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== CTA ====== -->
+<section class="cta-section" id="cta">
+  <div class="cta-glow"></div>
+  <div class="section-inner" style="text-align:center">
+    <div class="hero-badge reveal"><span class="dot"></span> Open Source — MIT License</div>
+    <h2 class="cta-title reveal">Ready to Meet<br><span style="background:var(--grad1);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Your Oracle Copilot?</span></h2>
+    <p class="cta-sub reveal">EQInt Savvy is a desktop overlay that makes Oracle Fusion HCM feel like it was built for humans. Clone the repo, install dependencies, configure your Oracle connection, and launch. Works on Windows, macOS, and Linux.</p>
+    <div class="cta-buttons reveal">
+      <button class="btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+        Clone Repo
+      </button>
+      <a class="btn-outline" href="#">npm install && npm start</a>
+    </div>
+    <div class="tech-badges reveal" style="justify-content:center;margin-top:48px">
+      <span class="tech-badge">Electron 44</span>
+      <span class="tech-badge">Python 3.13</span>
+      <span class="tech-badge">FastAPI</span>
+      <span class="tech-badge">Ollama</span>
+      <span class="tech-badge">Chart.js</span>
+      <span class="tech-badge">Tesseract.js</span>
+      <span class="tech-badge">keytar</span>
+      <span class="tech-badge">openid-client</span>
+      <span class="tech-badge">electron-store</span>
+      <span class="tech-badge">electron-updater</span>
+    </div>
+  </div>
+</section>
+
+<footer id="footer">
+  <p>EQInt Savvy v1.0.0 — Built for Oracle Fusion HCM</p>
+  <p style="margin-top:8px">App ID: <span style="font-family:var(--font-mono);color:var(--accent)">com.eqint.savvy-desktop</span></p>
+</footer>
+
+<!-- GSAP + ScrollTrigger + SplitText (CDN) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollToPlugin.min.js"></script>
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+(function(){
+  // ======== REGISTER GSAP PLUGINS ========
+  gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
+
+  // ======== THREE.JS SCENE ========
+  const canvas = document.getElementById('three-canvas');
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.z = 30;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  // Particles
+  const particleCount = 600;
+  const positions = new Float32Array(particleCount * 3);
+  const colors = new Float32Array(particleCount * 3);
+  const sizes = new Float32Array(particleCount);
+  const palette = [
+    [0, 0.83, 1],      // cyan
+    [0, 1, 0.53],      // green
+    [0.66, 0.33, 0.97], // purple
+    [0.98, 0.45, 0.09]  // orange
+  ];
+
+  for(let i = 0; i < particleCount; i++){
+    positions[i*3] = (Math.random() - 0.5) * 80;
+    positions[i*3+1] = (Math.random() - 0.5) * 80;
+    positions[i*3+2] = (Math.random() - 0.5) * 40;
+    const c = palette[Math.floor(Math.random() * palette.length)];
+    colors[i*3] = c[0]; colors[i*3+1] = c[1]; colors[i*3+2] = c[2];
+    sizes[i] = Math.random() * 2 + 0.5;
+  }
+
+  const particleGeo = new THREE.BufferGeometry();
+  particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  particleGeo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+  const particleMat = new THREE.PointsMaterial({
+    size: 0.15,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.6,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const particles = new THREE.Points(particleGeo, particleMat);
+  scene.add(particles);
+
+  // Floating geometries
+  const geometries = [];
+  const geoConfigs = [
+    { type: 'octahedron', color: 0x00d4ff, size: 1.2, speed: 0.3 },
+    { type: 'icosahedron', color: 0x00ff88, size: 0.9, speed: 0.5 },
+    { type: 'torus', color: 0xa855f7, size: 1.0, speed: 0.4 },
+    { type: 'dodecahedron', color: 0xf97316, size: 0.8, speed: 0.6 },
+    { type: 'tetrahedron', color: 0x00d4ff, size: 1.1, speed: 0.35 },
+  ];
+
+  geoConfigs.forEach((cfg, i) => {
+    let geo;
+    switch(cfg.type){
+      case 'octahedron': geo = new THREE.OctahedronGeometry(cfg.size); break;
+      case 'icosahedron': geo = new THREE.IcosahedronGeometry(cfg.size); break;
+      case 'torus': geo = new THREE.TorusGeometry(cfg.size, cfg.size * 0.4, 16, 32); break;
+      case 'dodecahedron': geo = new THREE.DodecahedronGeometry(cfg.size); break;
+      case 'tetrahedron': geo = new THREE.TetrahedronGeometry(cfg.size); break;
+    }
+    const mat = new THREE.MeshBasicMaterial({
+      color: cfg.color,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.15,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    const angle = (i / geoConfigs.length) * Math.PI * 2;
+    mesh.position.set(Math.cos(angle) * 12, Math.sin(angle) * 8 - 2, -5 - i * 3);
+    mesh.userData = { baseY: mesh.position.y, baseX: mesh.position.x, speed: cfg.speed, rotSpeed: cfg.speed * 0.5 };
+    scene.add(mesh);
+    geometries.push(mesh);
+  });
+
+  // Mouse tracking
+  let mouseX = 0, mouseY = 0;
+  document.addEventListener('mousemove', (e) => {
+    mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+    mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+  });
+
+  // Scroll progress
+  const scrollProgress = document.getElementById('scroll-progress');
+  let scrollVal = 0;
+
+  // Animate
+  function animate(){
+    requestAnimationFrame(animate);
+    const time = Date.now() * 0.001;
+
+    // Rotate particles
+    particles.rotation.y = time * 0.02;
+    particles.rotation.x = Math.sin(time * 0.1) * 0.1;
+
+    // Camera follows mouse
+    camera.position.x += (mouseX * 3 - camera.position.x) * 0.02;
+    camera.position.y += (mouseY * 2 - camera.position.y) * 0.02;
+    camera.lookAt(0, 0, 0);
+
+    // Float geometries
+    geometries.forEach((mesh) => {
+      mesh.rotation.x += mesh.userData.rotSpeed * 0.005;
+      mesh.rotation.y += mesh.userData.rotSpeed * 0.008;
+      mesh.position.y = mesh.userData.baseY + Math.sin(time * mesh.userData.speed) * 1.5;
+      mesh.position.x = mesh.userData.baseX + Math.cos(time * mesh.userData.speed * 0.7) * 0.8;
+    });
+
+    // Scroll-driven camera depth
+    const s = scrollVal;
+    camera.position.z = 30 - s * 8;
+    particles.rotation.z = s * 0.3;
+    geometries.forEach((mesh, i) => {
+      mesh.material.opacity = 0.15 + s * 0.1;
+    });
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ======== SCROLL PROGRESS BAR ========
+  ScrollTrigger.create({
+    trigger: document.body,
+    start: 'top top',
+    end: 'bottom bottom',
+    onUpdate: (self) => {
+      scrollVal = self.progress;
+      scrollProgress.style.transform = `scaleX(${self.progress})`;
+    }
+  });
+
+  // ======== NAV VISIBILITY ========
+  const nav = document.getElementById('nav');
+  ScrollTrigger.create({
+    trigger: '#hero',
+    start: 'bottom 100px',
+    onEnter: () => nav.classList.add('visible'),
+    onLeaveBack: () => nav.classList.remove('visible'),
+  });
+
+  // ======== HERO ANIMATIONS ========
+  const heroTl = gsap.timeline({ defaults: { ease: 'expo.out' } });
+  heroTl
+    .from('.hero-badge', { opacity: 0, y: 30, duration: 1, delay: 0.3 })
+    .from('.hero-title .line span', { y: 120, opacity: 0, duration: 1.2, stagger: 0.15 }, '-=0.6')
+    .from('.hero-sub', { opacity: 0, y: 30, duration: 1 }, '-=0.7')
+    .from('.hero-cta', { opacity: 0, y: 20, duration: 0.8 }, '-=0.5')
+    .from('.scroll-indicator', { opacity: 0, duration: 1 }, '-=0.3');
+
+  // ======== SET INITIAL HIDDEN STATES (GSAP owns the opacity/transform) ========
+  gsap.set('.reveal', { opacity: 0, y: 40 });
+  gsap.set('.reveal-left', { opacity: 0, x: -60 });
+  gsap.set('.reveal-right', { opacity: 0, x: 60 });
+  gsap.set('.reveal-scale', { opacity: 0, scale: 0.85 });
+
+  // ======== REVEAL ANIMATIONS (all .reveal elements) ========
+  gsap.utils.toArray('.reveal').forEach(el => {
+    gsap.to(el, {
+      opacity: 1, y: 0, duration: 1,
+      ease: 'power3.out',
+      scrollTrigger: {
+        trigger: el,
+        start: 'top 88%',
+        toggleActions: 'play none none none',
+      }
+    });
+  });
+
+  gsap.utils.toArray('.reveal-left').forEach(el => {
+    gsap.to(el, {
+      opacity: 1, x: 0, duration: 1,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: el, start: 'top 88%' }
+    });
+  });
+
+  gsap.utils.toArray('.reveal-right').forEach(el => {
+    gsap.to(el, {
+      opacity: 1, x: 0, duration: 1,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: el, start: 'top 88%' }
+    });
+  });
+
+  gsap.utils.toArray('.reveal-scale').forEach(el => {
+    gsap.to(el, {
+      opacity: 1, scale: 1, duration: 1.2,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: el, start: 'top 88%' }
+    });
+  });
+
+  // ======== DIVIDER NUMBERS — counter + scale ========
+  gsap.utils.toArray('.divider-num').forEach(el => {
+    gsap.from(el, {
+      scale: 0.5, opacity: 0, duration: 1.5,
+      ease: 'expo.out',
+      scrollTrigger: { trigger: el, start: 'top 80%' }
+    });
+  });
+
+  // ======== STAT CARDS — stagger reveal ========
+  gsap.utils.toArray('.feature-stats').forEach(container => {
+    const cards = container.querySelectorAll('.stat-card');
+    gsap.from(cards, {
+      opacity: 0, y: 30, duration: 0.6,
+      stagger: 0.12,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: container, start: 'top 85%' }
+    });
+  });
+
+  // ======== MOCKUP 3D TILT ON HOVER ========
+  document.querySelectorAll('.mockup-frame').forEach(frame => {
+    frame.addEventListener('mousemove', (e) => {
+      const r = frame.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      gsap.to(frame, {
+        rotateY: x * 8,
+        rotateX: -y * 8,
+        duration: 0.4,
+        ease: 'power2.out',
+        transformPerspective: 800,
+      });
+    });
+    frame.addEventListener('mouseleave', () => {
+      gsap.to(frame, { rotateY: 0, rotateX: 0, duration: 0.6, ease: 'elastic.out(1,0.5)' });
+    });
+  });
+
+  // ======== FLOAT ELEMENTS — hover magnetic ========
+  document.querySelectorAll('.float-element').forEach(el => {
+    el.addEventListener('mousemove', (e) => {
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - r.left - r.width / 2) * 0.3;
+      const y = (e.clientY - r.top - r.height / 2) * 0.3;
+      gsap.to(el, { x: `+=${x}`, y: `+=${y}`, duration: 0.4, ease: 'power2.out' });
+    });
+    el.addEventListener('mouseleave', () => {
+      gsap.to(el, { x: 0, y: 0, duration: 0.6, ease: 'elastic.out(1,0.4)' });
+    });
+  });
+
+  // ======== ICON ITEMS — stagger on scroll ========
+  gsap.utils.toArray('.icon-grid').forEach(grid => {
+    const items = grid.querySelectorAll('.icon-item');
+    gsap.from(items, {
+      opacity: 0, x: -30, duration: 0.5,
+      stagger: 0.08,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: grid, start: 'top 85%' }
+    });
+  });
+
+  // ======== ARCH CARDS — stagger on scroll ========
+  gsap.utils.toArray('.arch-grid').forEach(grid => {
+    const cards = grid.querySelectorAll('.arch-card');
+    gsap.from(cards, {
+      opacity: 0, y: 50, scale: 0.9, duration: 0.7,
+      stagger: 0.12,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: grid, start: 'top 85%' }
+    });
+  });
+
+  // ======== TOOL CARDS — stagger on scroll ========
+  gsap.utils.toArray('.tools-grid').forEach(grid => {
+    const cards = grid.querySelectorAll('.tool-card');
+    gsap.from(cards, {
+      opacity: 0, y: 40, duration: 0.6,
+      stagger: 0.1,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: grid, start: 'top 85%' }
+    });
+  });
+
+  // ======== TOOL CARD — hover tilt ========
+  document.querySelectorAll('.tool-card').forEach(card => {
+    card.addEventListener('mousemove', (e) => {
+      const r = card.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      gsap.to(card, {
+        rotateY: x * 6,
+        rotateX: -y * 6,
+        duration: 0.3,
+        ease: 'power2.out',
+        transformPerspective: 600,
+      });
+    });
+    card.addEventListener('mouseleave', () => {
+      gsap.to(card, { rotateY: 0, rotateX: 0, y: 0, duration: 0.5, ease: 'elastic.out(1,0.5)' });
+    });
+  });
+
+  // ======== ARCH CARD — hover lift ========
+  document.querySelectorAll('.arch-card').forEach(card => {
+    card.addEventListener('mouseenter', () => {
+      gsap.to(card, { y: -8, duration: 0.4, ease: 'power2.out' });
+    });
+    card.addEventListener('mouseleave', () => {
+      gsap.to(card, { y: 0, duration: 0.4, ease: 'power2.out' });
+    });
+  });
+
+  // ======== STAT CARD — counter animation ========
+  gsap.utils.toArray('.stat-num').forEach(el => {
+    ScrollTrigger.create({
+      trigger: el,
+      start: 'top 88%',
+      onEnter: () => {
+        const text = el.textContent;
+        if (/^\d+$/.test(text)) {
+          const target = parseInt(text);
+          const obj = { val: 0 };
+          gsap.to(obj, {
+            val: target, duration: 1.5, ease: 'power2.out',
+            onUpdate: () => { el.textContent = Math.round(obj.val); }
+          });
+        }
+      }
+    });
+  });
+
+  // ======== HORIZONTAL SCROLL SECTION ========
+  const hTrack = document.querySelector('.horizontal-track');
+  const hCards = document.querySelectorAll('.h-card');
+  const hSection = document.querySelector('.horizontal-section');
+  if (hTrack && hCards.length && hSection) {
+    // Set initial hidden state for cards
+    gsap.set(hCards, { opacity: 0, y: 40 });
+
+    const totalScroll = hTrack.scrollWidth - window.innerWidth + 80;
+    gsap.to(hTrack, {
+      x: () => -totalScroll,
+      ease: 'none',
+      scrollTrigger: {
+        trigger: hSection,
+        start: 'top 80%',
+        end: () => `+=${totalScroll}`,
+        scrub: 1,
+        invalidateOnRefresh: true,
+      }
+    });
+
+    // Reveal cards as section enters viewport
+    ScrollTrigger.create({
+      trigger: hSection,
+      start: 'top 80%',
+      onEnter: () => {
+        gsap.to(hCards, {
+          opacity: 1, y: 0,
+          duration: 0.6,
+          stagger: 0.08,
+          ease: 'power3.out',
+        });
+      },
+      once: true,
+    });
+  }
+
+  // ======== CTA SECTION — parallax glow ========
+  gsap.to('.cta-glow', {
+    y: -100,
+    ease: 'none',
+    scrollTrigger: {
+      trigger: '.cta-section',
+      start: 'top bottom',
+      end: 'bottom top',
+      scrub: true,
+    }
+  });
+
+  // ======== TECH BADGES — stagger ========
+  gsap.utils.toArray('.tech-badges').forEach(container => {
+    const badges = container.querySelectorAll('.tech-badge');
+    gsap.from(badges, {
+      opacity: 0, y: 20, duration: 0.4,
+      stagger: 0.05,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: container, start: 'top 90%' }
+    });
+  });
+
+  // ======== SMOOTH NAV LINKS ========
+  document.querySelectorAll('.nav-links a').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const target = document.querySelector(link.getAttribute('href'));
+      if (target) gsap.to(window, { scrollTo: target, duration: 1, ease: 'power3.inOut' });
+    });
+  });
+
+  // ======== PARALLAX on feature sections ========
+  gsap.utils.toArray('.feature-visual').forEach(visual => {
+    gsap.to(visual, {
+      y: -30,
+      ease: 'none',
+      scrollTrigger: {
+        trigger: visual.closest('.feature-section'),
+        start: 'top bottom',
+        end: 'bottom top',
+        scrub: 1,
+      }
+    });
+  });
+
+  // ======== SECTION BACKGROUND PARALLAX ========
+  gsap.utils.toArray('.feature-section').forEach(section => {
+    const inner = section.querySelector('.section-inner');
+    gsap.from(inner, {
+      y: 60,
+      ease: 'none',
+      scrollTrigger: {
+        trigger: section,
+        start: 'top bottom',
+        end: 'bottom top',
+        scrub: 1,
+      }
+    });
+  });
+
+  // ======== REDUCED MOTION ========
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    gsap.globalTimeline.timeScale(100); // instant
+    ScrollTrigger.getAll().forEach(st => st.kill());
+  }
+
+})();
+</script>
+</body>
+</html>
