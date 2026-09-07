@@ -234,7 +234,7 @@ section{position:relative;z-index:1;min-height:100vh;display:flex;align-items:ce
     <span class="nav-logo-text">Savvy</span>
   </a>
   <div class="nav-links">
-    <a href="#features">Features</a>
+    <a href="#features">Screen</a>
     <a href="#architecture">Architecture</a>
     <a href="#tools">Tools</a>
     <a href="#tech">Tech Stack</a>
@@ -250,11 +250,11 @@ section{position:relative;z-index:1;min-height:100vh;display:flex;align-items:ce
     <span class="line"><span class="outline">Your Oracle</span></span>
     <span class="line"><span class="outline">Copilot</span></span>
   </h1>
-  <p class="hero-sub">A frameless, always-on-top Electron overlay that reads your Oracle Fusion HCM pages via OCR, answers questions with a local LLM, runs payroll reconciliation across 4 modes, generates BIP reports, tracks 15 analytics dimensions, and executes 30+ HCM commands — all from your desktop. Zero cloud dependency for core features.</p>
+  <p class="hero-sub">A frameless, always-on-top Electron overlay that reads your Oracle Fusion HCM screens in real-time via OCR, understands what page you're on through cursor awareness, answers questions with a local LLM, runs payroll reconciliation across 4 modes, generates BIP reports, tracks 15 analytics dimensions, and executes 30+ HCM commands — all from your desktop. Zero cloud dependency for core features.</p>
   <div class="hero-cta">
     <button class="btn-primary" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-      Explore Features
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      How Screen Reading Works
     </button>
     <a class="btn-outline" href="#tech">Tech Stack</a>
   </div>
@@ -272,10 +272,103 @@ section{position:relative;z-index:1;min-height:100vh;display:flex;align-items:ce
   </div>
 </div>
 
-<!-- ====== FEATURE: AI CHAT ====== -->
+<!-- ====== FEATURE: SCREEN INTELLIGENCE ====== -->
 <section class="feature-section" id="features">
   <div class="section-inner">
     <div class="feature-grid">
+      <div class="feature-content">
+        <div class="feature-label reveal">Screen Intelligence</div>
+        <h2 class="feature-title reveal">Savvy Reads<br>Your Screen.</h2>
+        <p class="feature-desc reveal">Savvy doesn't just sit on your screen — it reads it. The Page Reader captures your active Oracle Fusion window via Electron's desktopCapturer API, runs Tesseract.js OCR to extract every visible field, table, and label, and feeds that context directly into the AI chat. Combined with cursor-awareness tracking (a 3x3 grid that detects which screen region you're hovering over), Savvy knows which Oracle page you're on, what data is visible, and what you're likely trying to do. It's like having a colleague looking over your shoulder who knows Oracle inside out.</p>
+        <div class="feature-stats">
+          <div class="stat-card reveal"><div class="stat-num">Real</div><div class="stat-label">Time OCR</div></div>
+          <div class="stat-card reveal"><div class="stat-num">3x3</div><div class="stat-label">Cursor Grid</div></div>
+          <div class="stat-card reveal"><div class="stat-num">0</div><div class="stat-label">Manual Input</div></div>
+        </div>
+        <div class="feature-list">
+          <div class="feature-list-item reveal"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div> Captures active Oracle screen via desktopCapturer API</div>
+          <div class="feature-list-item reveal"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div> Tesseract.js OCR extracts all visible fields, tables & labels</div>
+          <div class="feature-list-item reveal"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div> Cursor position detects which Oracle page section you're on</div>
+          <div class="feature-list-item reveal"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div> Extracted screen context auto-injected into AI chat</div>
+          <div class="feature-list-item reveal"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div> Multi-monitor support — captures the focused display</div>
+        </div>
+      </div>
+      <div class="feature-visual reveal-scale">
+        <div class="float-element float-1">OCR processing active screen...</div>
+        <div class="float-element float-2">Cursor region: top-right</div>
+        <div class="mockup-frame">
+          <div class="mockup-titlebar">
+            <div class="mockup-dot"></div><div class="mockup-dot"></div><div class="mockup-dot"></div>
+            <div class="mockup-title">Savvy — Screen Reader</div>
+          </div>
+          <div class="mockup-body">
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                <div style="width:8px;height:8px;border-radius:50%;background:var(--accent2);animation:pulse-dot 2s ease-in-out infinite"></div>
+                <span style="font-size:10px;font-weight:600;color:var(--accent2)">SCREEN CAPTURE ACTIVE</span>
+              </div>
+              <div style="font-size:10px;color:var(--text3);line-height:1.5">
+                <div style="margin-bottom:4px;color:var(--text2)">Oracle Fusion HCM — <span style="color:var(--accent)">Employee Absences</span></div>
+                <div style="background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);border-radius:6px;padding:8px;font-family:var(--font-mono);font-size:9px;line-height:1.6;color:var(--text3)">
+                  <div>Page: <span style="color:var(--accent)">Absence Management</span></div>
+                  <div>Employee: <span style="color:var(--text2)">Ahmad Al-Rashid (12345)</span></div>
+                  <div>Type: <span style="color:var(--text2)">Annual Leave</span></div>
+                  <div>Status: <span style="color:var(--accent4)">PENDING APPROVAL</span></div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;margin-bottom:10px">
+              <div style="flex:1;padding:8px;background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);border-radius:8px;text-align:center">
+                <div style="font-size:14px;margin-bottom:2px">&#x1F4F7;</div>
+                <div style="font-size:8px;color:var(--accent);font-weight:600">CAPTURE</div>
+                <div style="font-size:7px;color:var(--text3)">desktopCapturer</div>
+              </div>
+              <div style="flex:0 0 20px;display:flex;align-items:center;justify-content:center;color:var(--text3)">&#x2192;</div>
+              <div style="flex:1;padding:8px;background:rgba(0,255,136,0.05);border:1px solid rgba(0,255,136,0.15);border-radius:8px;text-align:center">
+                <div style="font-size:14px;margin-bottom:2px">&#x1F50D;</div>
+                <div style="font-size:8px;color:var(--accent2);font-weight:600">OCR</div>
+                <div style="font-size:7px;color:var(--text3)">Tesseract.js</div>
+              </div>
+              <div style="flex:0 0 20px;display:flex;align-items:center;justify-content:center;color:var(--text3)">&#x2192;</div>
+              <div style="flex:1;padding:8px;background:rgba(168,85,247,0.05);border:1px solid rgba(168,85,247,0.15);border-radius:8px;text-align:center">
+                <div style="font-size:14px;margin-bottom:2px">&#x1F9E0;</div>
+                <div style="font-size:8px;color:var(--accent3);font-weight:600">CONTEXT</div>
+                <div style="font-size:7px;color:var(--text3)">AI Chat Input</div>
+              </div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px">
+              <div style="font-size:9px;color:var(--text3);font-weight:600;margin-bottom:6px">CURSOR AWARENESS</div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">
+                <div style="padding:6px;background:var(--surface2);border-radius:4px;text-align:center;font-size:7px;color:var(--text3)">Header</div>
+                <div style="padding:6px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);border-radius:4px;text-align:center;font-size:7px;color:var(--accent);font-weight:600">Nav Menu</div>
+                <div style="padding:6px;background:var(--surface2);border-radius:4px;text-align:center;font-size:7px;color:var(--text3)">Actions</div>
+                <div style="padding:6px;background:var(--surface2);border-radius:4px;text-align:center;font-size:7px;color:var(--text3)">Sidebar</div>
+                <div style="padding:6px;background:var(--surface2);border-radius:4px;text-align:center;font-size:7px;color:var(--text3)">Main Content</div>
+                <div style="padding:6px;background:var(--surface2);border-radius:4px;text-align:center;font-size:7px;color:var(--text3)">Table</div>
+                <div style="padding:6px;background:var(--surface2);border-radius:4px;text-align:center;font-size:7px;color:var(--text3)">Footer</div>
+                <div style="padding:6px;background:var(--surface2);border-radius:4px;text-align:center;font-size:7px;color:var(--text3)">Pagination</div>
+                <div style="padding:6px;background:var(--surface2);border-radius:4px;text-align:center;font-size:7px;color:var(--text3)">Filters</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== DIVIDER 2 ====== -->
+<div class="divider-section">
+  <div class="divider-content">
+    <div class="divider-num reveal">02</div>
+    <div class="divider-text reveal">See everything.<br>Understand instantly.</div>
+  </div>
+</div>
+
+<!-- ====== FEATURE: AI CHAT ====== -->
+<section class="feature-section">
+  <div class="section-inner">
+    <div class="feature-grid reverse">
       <div class="feature-content">
         <div class="feature-label reveal">AI Chat Engine</div>
         <h2 class="feature-title reveal">Ask Anything.<br>Get Answers.</h2>
@@ -304,7 +397,7 @@ section{position:relative;z-index:1;min-height:100vh;display:flex;align-items:ce
           <div class="mockup-body">
             <div style="display:flex;gap:8px;margin-bottom:16px">
               <div style="width:28px;height:28px;border-radius:8px;background:var(--grad1);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#000;flex-shrink:0">EQ</div>
-              <div style="padding:10px 14px;background:var(--surface);border-radius:10px;border-bottom-left-radius:3px;font-size:13px;color:var(--text2);max-width:80%">Hi! I can see your Oracle page and help you navigate. Ask me anything.</div>
+              <div style="padding:10px 14px;background:var(--surface);border-radius:10px;border-bottom-left-radius:3px;font-size:13px;color:var(--text2);max-width:80%">I can see you're on the <strong style="color:var(--accent)">Absence Management</strong> page. Ahmad Al-Rashid has a pending Annual Leave request. Would you like me to approve it or check the details?</div>
             </div>
             <div style="display:flex;gap:8px;margin-bottom:16px;flex-direction:row-reverse">
               <div style="width:28px;height:28px;border-radius:8px;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:var(--text);flex-shrink:0">U</div>
@@ -321,6 +414,10 @@ section{position:relative;z-index:1;min-height:100vh;display:flex;align-items:ce
                 </div>
               </div>
             </div>
+            <div style="margin-top:16px;padding:8px 10px;background:rgba(168,85,247,0.05);border:1px solid rgba(168,85,247,0.15);border-radius:6px;display:flex;align-items:center;gap:6px">
+              <div style="width:6px;height:6px;border-radius:50%;background:var(--accent3)"></div>
+              <span style="font-size:9px;color:var(--accent3);font-weight:500">Screen context captured from Oracle Fusion — no copy/paste needed</span>
+            </div>
             <div style="margin-top:20px;display:flex;gap:6px;flex-wrap:wrap">
               <div style="padding:5px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:10px;color:var(--text3)">Absences</div>
               <div style="padding:5px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:10px;color:var(--text3)">Clock In</div>
@@ -333,10 +430,10 @@ section{position:relative;z-index:1;min-height:100vh;display:flex;align-items:ce
   </div>
 </section>
 
-<!-- ====== DIVIDER 2 ====== -->
+<!-- ====== DIVIDER 3 ====== -->
 <div class="divider-section">
   <div class="divider-content">
-    <div class="divider-num reveal">02</div>
+    <div class="divider-num reveal">03</div>
     <div class="divider-text reveal">See everything.<br>Understand instantly.</div>
   </div>
 </div>
@@ -426,10 +523,10 @@ section{position:relative;z-index:1;min-height:100vh;display:flex;align-items:ce
   </div>
 </section>
 
-<!-- ====== DIVIDER 3 ====== -->
+<!-- ====== DIVIDER 4 ====== -->
 <div class="divider-section">
   <div class="divider-content">
-    <div class="divider-num reveal">03</div>
+    <div class="divider-num reveal">04</div>
     <div class="divider-text reveal">15 analytics tabs.<br>Zero guesswork.</div>
   </div>
 </div>
@@ -509,10 +606,10 @@ section{position:relative;z-index:1;min-height:100vh;display:flex;align-items:ce
   </div>
 </section>
 
-<!-- ====== DIVIDER 4 ====== -->
+<!-- ====== DIVIDER 5 ====== -->
 <div class="divider-section">
   <div class="divider-content">
-    <div class="divider-num reveal">04</div>
+    <div class="divider-num reveal">05</div>
     <div class="divider-text reveal">Policy-driven.<br>Automated reconciliation.</div>
   </div>
 </div>
@@ -583,10 +680,10 @@ section{position:relative;z-index:1;min-height:100vh;display:flex;align-items:ce
   </div>
 </section>
 
-<!-- ====== DIVIDER 5 ====== -->
+<!-- ====== DIVIDER 6 ====== -->
 <div class="divider-section">
   <div class="divider-content">
-    <div class="divider-num reveal">05</div>
+    <div class="divider-num reveal">06</div>
     <div class="divider-text reveal">Reports. Screens. Policies.<br>All tools in one overlay.</div>
   </div>
 </div>
@@ -672,6 +769,40 @@ section{position:relative;z-index:1;min-height:100vh;display:flex;align-items:ce
     </div>
   </div>
 </div>
+
+<!-- ====== SCREEN INTELLIGENCE DEEP DIVE ====== -->
+<section class="feature-section">
+  <div class="section-inner">
+    <div style="text-align:center;margin-bottom:64px">
+      <div class="feature-label reveal" style="justify-content:center">How It Works</div>
+      <h2 class="feature-title reveal" style="text-align:center">Screen Intelligence<br>as a System</h2>
+      <p class="feature-desc reveal" style="text-align:center;max-width:640px;margin:0 auto">Three subsystems work together continuously — capture, understand, and act. No manual steps, no copy-paste, no context switching. Savvy reads your screen the moment you look at it.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:32px">
+      <div class="arch-card reveal">
+        <div class="arch-card-icon" style="background:rgba(0,212,255,0.1)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <div class="arch-card-title">1. Capture</div>
+        <div class="arch-card-desc">Electron's desktopCapturer API detects your active window — whether it's Oracle Fusion in Chrome, a BIP report in Firefox, or any other application. It captures a high-resolution screenshot of the focused display (multi-monitor aware) and passes it to the OCR pipeline. No browser extension needed, no API tokens required. Works on any OS.</div>
+      </div>
+      <div class="arch-card reveal">
+        <div class="arch-card-icon" style="background:rgba(0,255,136,0.1)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <div class="arch-card-title">2. Understand</div>
+        <div class="arch-card-desc">Tesseract.js runs OCR locally (eng.traineddata) — no cloud calls. It extracts every visible text element: field labels, form values, table headers, button text, status badges, page titles. The extracted text is structured into a context object with page identification, employee data, and form state. Cursor position (3x3 grid) adds spatial awareness — Savvy knows if you're looking at the nav bar, a data table, or action buttons.</div>
+      </div>
+      <div class="arch-card reveal">
+        <div class="arch-card-icon" style="background:rgba(168,85,247,0.1)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        </div>
+        <div class="arch-card-title">3. Act</div>
+        <div class="arch-card-desc">The captured context is injected directly into the AI chat as invisible metadata. When you ask "approve this", Savvy already knows which employee, which absence request, and what page you're on. The LLM uses this context to generate precise, actionable responses. No "which employee?" clarifications needed. The chat also pre-populates quick-action chips based on what's on screen — Absences, Clock In, Payroll — so you can act in one click.</div>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- ====== ARCHITECTURE SECTION ====== -->
 <section class="arch-section" id="architecture">
