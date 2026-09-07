@@ -24,4 +24,19 @@ contextBridge.exposeInMainWorld('savvy', {
   setUiState: (key, value) => ipcRenderer.invoke('set-ui-state', key, value),
   getConversationHistory: () => ipcRenderer.invoke('get-conversation-history'),
   saveConversationHistory: (history) => ipcRenderer.invoke('set-conversation-history', history),
+
+  // Desktop app bridges
+  getLocalToken: () => ipcRenderer.invoke('auth:getLocalToken'),
+  windowMinimize: () => ipcRenderer.send('window:minimize'),
+  windowMaximize: () => ipcRenderer.send('window:maximize'),
+  windowClose: () => ipcRenderer.send('window:close'),
+  openFiles: (options) => ipcRenderer.invoke('dialog:openFiles', options),
+  saveFile: (options) => ipcRenderer.invoke('dialog:saveFile', options),
+  showMessageBox: (options) => ipcRenderer.invoke('dialog:showMessageBox', options),
+  readFile: (filePath) => ipcRenderer.invoke('file:read', filePath),
+  writeFile: (filePath, data) => ipcRenderer.invoke('file:write', filePath, data),
+  openExternal: (url) => ipcRenderer.send('shell:openExternal', url),
+  apiRequest: (opts) => ipcRenderer.invoke('api:request', opts),
+  storeGet: (key) => ipcRenderer.invoke('store:get', key),
+  storeSet: (key, value) => ipcRenderer.invoke('store:set', key, value),
 });

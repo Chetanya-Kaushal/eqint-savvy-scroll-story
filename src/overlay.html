@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:11434 http://127.0.0.1:11434">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' http://localhost:* http://127.0.0.1:* https://*.oraclecloud.com">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body {
@@ -38,14 +38,16 @@ body {
 }
 #titlebar:active { cursor: grabbing; }
 #titlebar .logo {
-  width: 28px; height: 28px; border-radius: 7px;
+  width: 30px; height: 30px; border-radius: 7px;
   background: rgba(255,255,255,0.2);
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
   z-index: 2;
+  flex-shrink: 0;
 }
 #titlebar .logo img {
   width: 100%; height: 100%; object-fit: cover;
+  border-radius: 5px;
 }
 #titlebar .info { flex:1; margin-left: 10px; z-index: 2; }
 #titlebar .name { font-weight: 600; font-size: 13px; text-shadow: 0 1px 2px rgba(0,0,0,0.1); }
@@ -113,45 +115,134 @@ body {
 
 /* Tabs */
 .tabs {
-  display: flex; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(0,0,0,0.05);
   flex-shrink: 0;
 }
 .tab {
-  flex: 1; padding: 9px; border: none; background: none;
-  font-size: 11px; font-weight: 500; color: #64748b;
+  flex: 1; padding: 10px; border: none; background: none;
+  font-size: 12px; font-weight: 500; color: #64748b;
   cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all 0.2s;
 }
-.tab.active { color: #0070F3; border-bottom-color: #0070F3; }
+.tab:hover { color: #334155; background: rgba(0,0,0,0.02); }
+.tab.active { color: #0070F3; border-bottom-color: #0070F3; font-weight: 600; }
 
-/* Tab content */
-.tab-content { display: none; flex-direction: column; flex: 1; overflow: hidden; }
-.tab-content.active { display: flex; }
-#tab-chat { flex-direction: column; }
-#tab-settings { flex-direction: column; overflow-y: auto; }
+/* Live animated light background - matches title bar blue-green theme */
+#tab-chat {
+  flex-direction: column;
+  position: relative;
+  background: linear-gradient(135deg, #e8f4fd 0%, #d4f5e9 30%, #e0f7fa 60%, #e8f8f5 100%);
+  background-size: 300% 300%;
+  animation: liveGradient 10s ease infinite;
+}
+@keyframes liveGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Floating orbs - blue and green matching EQInt branding */
+#tab-chat::before, #tab-chat::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(50px);
+  opacity: 0.35;
+}
+#tab-chat::before {
+  width: 140px; height: 140px;
+  background: radial-gradient(circle, rgba(0,112,243,0.4), transparent);
+  top: -40px; right: -30px;
+  animation: floatOrb1 7s ease-in-out infinite;
+}
+#tab-chat::after {
+  width: 120px; height: 120px;
+  background: radial-gradient(circle, rgba(0,201,167,0.4), transparent);
+  bottom: 30px; left: -25px;
+  animation: floatOrb2 9s ease-in-out infinite;
+}
+@keyframes floatOrb1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-15px, 25px) scale(1.05); }
+}
+@keyframes floatOrb2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(12px, -20px) scale(0.95); }
+}
+
+/* Third orb */
+.orb-3 {
+  position: absolute;
+  width: 90px; height: 90px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,180,216,0.25), transparent);
+  filter: blur(35px);
+  pointer-events: none;
+  z-index: 0;
+  top: 45%; left: 35%;
+  animation: floatOrb3 8s ease-in-out infinite;
+}
+@keyframes floatOrb3 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(18px, 18px); }
+}
 
 /* Messages */
 .messages {
-  flex: 1; overflow-y: auto; padding: 10px;
-  display: flex; flex-direction: column; gap: 6px;
+  flex: 1; overflow-y: auto; padding: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+  position: relative; z-index: 1;
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 14px;
+  margin: 6px 8px;
+  border: 1px solid rgba(255,255,255,0.6);
 }
-.msg { display: flex; gap: 7px; }
+.msg { display: flex; gap: 8px; align-items: flex-end; }
 .msg.bot { align-self: flex-start; }
 .msg.user { align-self: flex-end; flex-direction: row-reverse; }
 .msg-avatar {
-  width: 24px; height: 24px; border-radius: 6px; font-size: 9px;
+  width: 36px; height: 36px; border-radius: 0; font-size: 9px;
   font-weight: 700; display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  flex-shrink: 0; overflow: hidden;
+  background: transparent;
+  padding: 2px;
 }
-.msg.bot .msg-avatar { background: linear-gradient(135deg,#0070F3,#00C9A7); color: white; }
-.msg.user .msg-avatar { background: #e2e8f0; color: #475569; }
+.msg.bot .msg-avatar { background: transparent; }
+.msg.user .msg-avatar { background: transparent; }
+.msg-avatar img { width: 100%; height: auto; object-fit: contain; border-radius: 0; }
 .msg-text {
-  padding: 8px 12px; border-radius: 10px; font-size: 12px;
-  line-height: 1.4; word-break: break-word;
-  max-width: 85%;
+  padding: 10px 14px; border-radius: 14px; font-size: 12.5px;
+  line-height: 1.5; word-break: break-word;
+  max-width: 82%;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  animation: msgFadeIn 0.2s ease-out;
+}
+@keyframes msgFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .msg.user .msg-text { white-space: pre-wrap; }
-.msg.bot .msg-text { background: #f1f5f9; border-bottom-left-radius: 3px; }
-.msg.user .msg-text { background: #0070F3; color: white; border-bottom-right-radius: 3px; }
+.msg.bot .msg-text {
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(0,112,243,0.08);
+  border-bottom-left-radius: 4px;
+  color: #1e293b;
+}
+.msg.user .msg-text {
+  background: linear-gradient(135deg, #0070F3, #00a88a);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
 .msg-text.thinking { color: #94a3b8; font-style: italic; }
 
 /* Data display */
@@ -168,19 +259,37 @@ body {
 
 /* Input */
 .input-area {
-  display: flex; gap: 6px; padding: 10px; border-top: 1px solid #e2e8f0;
+  display: flex; gap: 6px; padding: 8px 10px;
   flex-shrink: 0;
+  position: relative; z-index: 1;
 }
 .input-area input {
-  flex: 1; padding: 8px 12px; border: 1px solid #e2e8f0;
-  border-radius: 8px; font-size: 12px; outline: none;
+  flex: 1; padding: 10px 14px;
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 12px; font-size: 12.5px; outline: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
-.input-area input:focus { border-color: #0070F3; }
+.input-area input:focus {
+  border-color: rgba(0,112,243,0.4);
+  box-shadow: 0 0 0 3px rgba(0,112,243,0.1);
+}
 .send-btn {
-  padding: 8px 14px; background: linear-gradient(135deg,#0070F3,#00C9A7);
-  color: white; border: none; border-radius: 8px; font-weight: 600;
-  cursor: pointer; font-size: 12px;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #0070F3, #00C9A7);
+  color: white; border: none; border-radius: 12px; font-weight: 600;
+  cursor: pointer; font-size: 12.5px;
+  box-shadow: 0 2px 8px rgba(0,112,243,0.3);
+  transition: transform 0.15s, box-shadow 0.15s;
 }
+.send-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,112,243,0.4);
+}
+.send-btn:active { transform: translateY(0); }
 
 /* Page Reader */
 #read-content {
@@ -217,17 +326,184 @@ body {
   color: #166534; margin: 0 12px 8px;
 }
 
+/* Nav icons in title bar */
+.nav-icons {
+  display: flex; gap: 3px; z-index: 2;
+  -webkit-app-region: no-drag;
+}
+.nav-icon-btn {
+  width: 26px; height: 26px; border: none; border-radius: 6px;
+  background: rgba(255,255,255,0.2); color: white;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px); transition: background 0.2s;
+}
+.nav-icon-btn:hover { background: rgba(255,255,255,0.4); }
+.nav-icon-btn svg { width: 14px; height: 14px; }
+
+/* Expanded layout */
+#app.expanded { border-radius: 0; border: none; }
+#app.expanded #titlebar { padding: 8px 16px; }
+#app.expanded .tabs { display: none; }
+#app.expanded #tab-chat { display: none; }
+#app.expanded #tab-settings { display: none; }
+
+.expanded-layout {
+  display: none; flex: 1; flex-direction: row; overflow: hidden;
+}
+#app.expanded .expanded-layout { display: flex; }
+
+/* Sidebar in expanded mode */
+.expanded-sidebar {
+  width: 200px; background: #f8fafc; border-right: 1px solid #e2e8f0;
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+.expanded-sidebar .sidebar-header {
+  padding: 16px; border-bottom: 1px solid #e2e8f0;
+}
+.expanded-sidebar .sidebar-logo {
+  display: flex; align-items: center; gap: 10px;
+}
+.expanded-sidebar .sidebar-logo img { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; }
+.expanded-sidebar .sidebar-logo .logo-text .name { font-weight: 700; font-size: 14px; color: #1e293b; }
+.expanded-sidebar .sidebar-logo .logo-text .version { font-size: 10px; color: #64748b; }
+
+.expanded-sidebar .sidebar-nav { flex: 1; padding: 8px; overflow-y: auto; }
+.expanded-sidebar .nav-label {
+  font-size: 10px; font-weight: 600; color: #64748b;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 12px 8px 4px;
+}
+.expanded-sidebar .sidebar-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border: none; background: none;
+  border-radius: 8px; cursor: pointer; font-size: 13px;
+  color: #475569; width: 100%; text-align: left;
+  transition: all 0.15s;
+}
+.expanded-sidebar .sidebar-nav-item:hover { background: #e2e8f0; color: #1e293b; }
+.expanded-sidebar .sidebar-nav-item.active { background: #dbeafe; color: #0070F3; font-weight: 600; }
+.expanded-sidebar .sidebar-nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+.expanded-sidebar .sidebar-footer {
+  padding: 12px; border-top: 1px solid #e2e8f0;
+  font-size: 11px; color: #64748b;
+  display: flex; align-items: center; gap: 6px;
+}
+.expanded-sidebar .sidebar-footer .status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #22c55e;
+}
+
+/* Expanded content area */
+.expanded-content {
+  flex: 1; overflow-y: auto; background: white;
+}
+.expanded-content .page {
+  padding: 24px;
+}
+.expanded-content .page-header {
+  margin-bottom: 20px;
+}
+.expanded-content .page-title {
+  font-size: 22px; font-weight: 700; color: #1e293b; margin-bottom: 4px;
+}
+.expanded-content .page-subtitle {
+  font-size: 13px; color: #64748b;
+}
+.expanded-content .back-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; background: #f1f5f9; border: 1px solid #e2e8f0;
+  border-radius: 6px; font-size: 12px; cursor: pointer; color: #475569;
+  margin-bottom: 16px;
+}
+.expanded-content .back-btn:hover { background: #e2e8f0; }
+
+/* Dashboard cards */
+.dash-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px; margin-top: 16px;
+}
+.dash-card {
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 16px; transition: box-shadow 0.2s;
+}
+.dash-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.dash-card .card-label {
+  font-size: 11px; font-weight: 600; color: #64748b;
+  text-transform: uppercase; margin-bottom: 8px;
+}
+.dash-card .card-value {
+  font-size: 24px; font-weight: 700; color: #1e293b;
+}
+.dash-card .card-sub {
+  font-size: 11px; color: #94a3b8; margin-top: 4px;
+}
+
+/* Recon page */
+.recon-section { margin-bottom: 20px; }
+.recon-section h3 { font-size: 15px; font-weight: 600; color: #1e293b; margin-bottom: 12px; }
+.recon-btn {
+  padding: 10px 20px; background: linear-gradient(135deg, #0070F3, #00C9A7);
+  color: white; border: none; border-radius: 8px; font-weight: 600;
+  cursor: pointer; font-size: 13px; transition: opacity 0.2s;
+}
+.recon-btn:hover { opacity: 0.9; }
+.recon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.recon-status {
+  padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0;
+  border-radius: 8px; font-size: 12px; color: #475569;
+  margin-top: 12px; min-height: 40px;
+}
+.recon-table {
+  width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px;
+}
+.recon-table th {
+  background: #f1f5f9; padding: 8px 12px; text-align: left;
+  font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0;
+}
+.recon-table td {
+  padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #334155;
+}
+.recon-table tr:hover { background: #f8fafc; }
+.recon-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 600;
+}
+.recon-badge.match { background: #dcfce7; color: #166534; }
+.recon-badge.mismatch { background: #fee2e2; color: #991b1b; }
+.recon-badge.pending { background: #fef3c7; color: #92400e; }
+
+/* Loading spinner */
+.spinner {
+  display: inline-block; width: 16px; height: 16px;
+  border: 2px solid #e2e8f0; border-top-color: #0070F3;
+  border-radius: 50%; animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* Quick actions */
 .quick-bar {
-  display: flex; gap: 4px; padding: 6px 10px; flex-shrink: 0;
+  display: flex; gap: 5px; padding: 6px 10px; flex-shrink: 0;
   overflow-x: auto;
+  position: relative; z-index: 1;
 }
 .quick-btn {
-  padding: 5px 8px; background: #f1f5f9; border: 1px solid #e2e8f0;
-  border-radius: 6px; font-size: 10px; cursor: pointer; white-space: nowrap;
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 10px; font-size: 11px; cursor: pointer; white-space: nowrap;
   color: #475569;
+  transition: all 0.15s;
 }
-.quick-btn:hover { background: #e2e8f0; }
+.quick-btn:hover {
+  background: rgba(255,255,255,0.9);
+  border-color: rgba(0,112,243,0.3);
+  color: #0070F3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
 
 /* Collapsible sections */
 .section-header {
@@ -277,6 +553,68 @@ body {
 }
 .read-btn.live-active {
   background: linear-gradient(135deg, #EF4444, #DC2626) !important;
+}
+
+/* Policy upload section */
+.policy-section {
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 16px; margin-bottom: 20px;
+}
+.policy-section h3 {
+  font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.policy-section .policy-hint {
+  font-size: 11px; color: #64748b; margin-bottom: 10px; line-height: 1.4;
+}
+.policy-textarea {
+  width: 100%; min-height: 80px; padding: 10px; border: 1px solid #e2e8f0;
+  border-radius: 8px; font-size: 12px; font-family: inherit; resize: vertical;
+  outline: none; line-height: 1.5;
+}
+.policy-textarea:focus { border-color: #0070F3; }
+.policy-name-input {
+  width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0;
+  border-radius: 8px; font-size: 12px; outline: none; margin-top: 8px;
+}
+.policy-name-input:focus { border-color: #0070F3; }
+.policy-actions {
+  display: flex; gap: 8px; margin-top: 10px; align-items: center;
+}
+.policy-result {
+  margin-top: 10px; padding: 10px; border-radius: 8px;
+  font-size: 11px; line-height: 1.5; white-space: pre-wrap;
+}
+.policy-result.success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+.policy-result.error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+.policy-active {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;
+  font-size: 11px; color: #166534; margin-bottom: 12px;
+}
+.policy-active .policy-name { font-weight: 600; }
+.policy-active button {
+  margin-left: auto; background: none; border: none; color: #991b1b;
+  cursor: pointer; font-size: 11px; text-decoration: underline;
+}
+/* Recon chat */
+.recon-chat-box {
+  border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden;
+  margin-top: 16px;
+}
+.recon-chat-messages {
+  height: 200px; overflow-y: auto; padding: 10px; background: #fafbfc;
+  font-size: 11px; line-height: 1.5;
+}
+.recon-chat-input {
+  display: flex; border-top: 1px solid #e2e8f0;
+}
+.recon-chat-input input {
+  flex: 1; padding: 8px 10px; border: none; font-size: 12px; outline: none;
+}
+.recon-chat-input button {
+  padding: 8px 14px; background: linear-gradient(135deg, #0070F3, #00C9A7);
+  color: white; border: none; font-weight: 600; cursor: pointer; font-size: 12px;
 }
 
 /* Bubble mode - Moon in clouds */
@@ -413,10 +751,24 @@ body {
         <rect x="8" y="6" width="2" height="2"/><rect x="10" y="6" width="2" height="2"/><rect x="12" y="6" width="2" height="2"/>
       </svg>
     </div>
-    <div class="logo"><img src="../assets/icon.png" alt="EQInt" class="brand-icon" data-fallback-size="12px" data-fallback-color="inherit" /></div>
+    <div class="logo"><img src="../assets/logo-icon.png" alt="EQInt" class="brand-icon" data-fallback-size="12px" data-fallback-color="inherit" /></div>
     <div class="info">
       <div class="name">Savvy</div>
       <div class="status" id="status">Ready</div>
+    </div>
+    <div class="nav-icons">
+      <button class="nav-icon-btn" id="navDashboard" title="Dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      </button>
+      <button class="nav-icon-btn" id="navRecon" title="Oracle Recon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 002 2z"/><path d="M18 16v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+      </button>
+      <button class="nav-icon-btn" id="navBip" title="BIP Reports">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15h6"/></svg>
+      </button>
+      <button class="nav-icon-btn" id="navAnalytics" title="Analytics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 118 2.83"/><path d="M22 12A10 10 0 0012 2v10z"/></svg>
+      </button>
     </div>
     <div class="btn-group">
       <button class="title-btn" id="collapseBtn" title="Minimize to bubble">&#8722;</button>
@@ -431,9 +783,10 @@ body {
 
   <!-- Chat Tab -->
   <div id="tab-chat" class="tab-content active">
+    <div class="orb-3"></div>
     <div class="messages" id="messages">
       <div class="msg bot">
-        <div class="msg-avatar">EQ</div>
+        <div class="msg-avatar"><img src="../assets/logo-chat-icon.png" alt="EQInt" style="width:100%;height:100%;object-fit:contain;" /></div>
         <div class="msg-text">Hi! I can see your Oracle page and help you navigate. Ask me anything.</div>
       </div>
     </div>
@@ -492,6 +845,52 @@ body {
       <button class="read-btn" id="backToWindows" style="display:none;margin:10px 0;width:100%;">Back to Window List</button>
     </div>
   </div>
+
+  <!-- Expanded layout (shown when a desktop page is selected) -->
+  <div class="expanded-layout">
+    <nav class="expanded-sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <img src="../assets/logo-sidebar.png" alt="EQInt">
+          <div class="logo-text">
+            <div class="name">EQInt Savvy</div>
+            <div class="version">v2.0</div>
+          </div>
+        </div>
+      </div>
+      <div class="sidebar-nav">
+        <div class="nav-label">MAIN</div>
+        <button class="sidebar-nav-item active" data-page="dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Dashboard
+        </button>
+        <button class="sidebar-nav-item" data-page="chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Chat
+        </button>
+        <div class="nav-label">TOOLS</div>
+        <button class="sidebar-nav-item" data-page="reconciliation">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 002 2z"/><path d="M18 16v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+          Policy + Recon
+        </button>
+        <button class="sidebar-nav-item" data-page="bip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15h6"/></svg>
+          BIP Reports
+        </button>
+        <button class="sidebar-nav-item" data-page="analytics">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 118 2.83"/><path d="M22 12A10 10 0 0012 2v10z"/></svg>
+          Analytics
+        </button>
+      </div>
+      <div class="sidebar-footer">
+        <div class="status-dot"></div>
+        <span>Connected</span>
+      </div>
+    </nav>
+    <div class="expanded-content" id="expandedContent">
+      <!-- Page content loaded dynamically -->
+    </div>
+  </div>
 </div>
 
 <!-- Bubble overlay (shown when collapsed) - Moon in clouds -->
@@ -501,7 +900,7 @@ body {
     <div class="cloud cloud-2"></div>
     <div class="cloud cloud-3"></div>
     <div class="moon">
-      <img src="../assets/icon.png" alt="EQInt" class="brand-icon" data-fallback-size="16px" data-fallback-color="white" />
+      <img src="../assets/logo-full.png" alt="EQInt" class="brand-icon" data-fallback-size="16px" data-fallback-color="white" />
     </div>
     <div class="sparkle sparkle-1"></div>
     <div class="sparkle sparkle-2"></div>
@@ -510,6 +909,526 @@ body {
   </div>
 </div>
 
+<script>
+(function() {
+  const COMPACT_W = 420, COMPACT_H = 750;
+  const EXPANDED_W = 1400, EXPANDED_H = 900;
+  const app = document.getElementById('app');
+  const content = document.getElementById('expandedContent');
+  let expanded = false;
+  let savedPos = null;
+
+  const API = 'http://localhost:8080';
+  const BIP = 'http://localhost:3000';
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  async function expandTo(page) {
+    if (expanded) { renderPage(page); setActiveNav(page); return; }
+    savedPos = await window.savvy.getOverlayPosition();
+    await window.savvy.setOverlaySize({ width: EXPANDED_W, height: EXPANDED_H });
+    await window.savvy.centerWindow();
+    app.classList.add('expanded');
+    expanded = true;
+    renderPage(page);
+    setActiveNav(page);
+  }
+
+  async function collapseToChat() {
+    if (!expanded) return;
+    app.classList.remove('expanded');
+    expanded = false;
+    await window.savvy.setOverlaySize({ width: COMPACT_W, height: COMPACT_H });
+    if (savedPos) {
+      await window.savvy.setOverlayPosition(savedPos);
+    }
+  }
+
+  function setActiveNav(page) {
+    document.querySelectorAll('.sidebar-nav-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.page === page);
+    });
+  }
+
+  function renderPage(page) {
+    switch (page) {
+      case 'dashboard': renderDashboard(); break;
+      case 'reconciliation': renderRecon(); break;
+      case 'bip': renderBip(); break;
+      case 'analytics': renderAnalytics(); break;
+      case 'chat': collapseToChat(); break;
+    }
+  }
+
+  function renderDashboard() {
+    content.innerHTML = `
+      <div class="page">
+        <div class="page-header">
+          <div class="page-title">Oracle HCM Dashboard</div>
+          <div class="page-subtitle">Live data from Oracle Cloud</div>
+        </div>
+        <div class="dash-grid" id="dashGrid">
+          <div class="dash-card"><div class="card-label">Employees</div><div class="card-value" id="dashEmpCount">...</div><div class="card-sub">Active workforce</div></div>
+          <div class="dash-card"><div class="card-label">Absences</div><div class="card-value" id="dashAbsCount">...</div><div class="card-sub">Open requests</div></div>
+          <div class="dash-card"><div class="card-label">Payroll</div><div class="card-value" id="dashPayroll">...</div><div class="card-sub">Current period</div></div>
+          <div class="dash-card"><div class="card-label">Requisitions</div><div class="card-value" id="dashReqs">...</div><div class="card-sub">Open positions</div></div>
+        </div>
+        <div id="dashDetail" style="margin-top:20px;"></div>
+      </div>`;
+    loadDashboardData();
+  }
+
+  async function loadDashboardData() {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    try {
+      const r = await fetch(API + '/api/hcm/workers?limit=1');
+      const d = await r.json();
+      set('dashEmpCount', d.total_count || d.items?.length || '—');
+    } catch { set('dashEmpCount', '—'); }
+    try {
+      const r = await fetch(API + '/api/hcm/absences');
+      const d = await r.json();
+      set('dashAbsCount', d.total_count || d.items?.length || '—');
+    } catch { set('dashAbsCount', '—'); }
+    try {
+      const r = await fetch(API + '/api/payroll/reconcile/available-periods');
+      const d = await r.json();
+      set('dashPayroll', d.periods?.length ? d.periods[0].name || '1' : '—');
+    } catch { set('dashPayroll', '—'); }
+    set('dashReqs', '—');
+  }
+
+  let activePolicy = null;
+
+  function renderRecon() {
+    content.innerHTML = `
+      <div class="page">
+        <div class="page-header">
+          <div class="page-title">Oracle Payroll Reconciliation</div>
+          <div class="page-subtitle">Compare Oracle payroll data against company policy rules</div>
+        </div>
+
+        <!-- Policy Upload Section -->
+        <div class="policy-section" id="policySection">
+          <h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15h6"/></svg>
+            Company Policy
+          </h3>
+          <div id="activePolicyDisplay"></div>
+
+          <!-- File upload area -->
+          <div class="policy-file-upload" id="policyFileDrop" style="border:2px dashed rgba(0,112,243,0.3);border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:rgba(255,255,255,0.4);backdrop-filter:blur(8px);transition:all 0.2s;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#0070F3" stroke-width="2" style="width:28px;height:28px;margin-bottom:6px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div style="font-size:12px;font-weight:600;color:#1e293b;">Drop policy file or click to browse</div>
+            <div style="font-size:10px;color:#64748b;margin-top:3px;">Supports PDF, DOCX, TXT</div>
+            <input type="file" id="policyFileInput" accept=".pdf,.docx,.doc,.txt" style="display:none;" />
+          </div>
+
+          <div id="policyFileName" style="display:none;padding:6px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:11px;color:#1e40af;margin-top:8px;display:flex;align-items:center;gap:6px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span id="policyFileNameText"></span>
+            <button onclick="document.getElementById('policyFileInput').value='';document.getElementById('policyFileName').style.display='none';" style="background:none;border:none;cursor:pointer;color:#64748b;margin-left:auto;font-size:14px;">&times;</button>
+          </div>
+
+          <div class="policy-actions" style="margin-top:8px;">
+            <button class="recon-btn" id="uploadPolicyBtn" style="font-size:12px;">Extract & Upload Policy</button>
+            <span id="policyStatus" style="font-size:11px;color:#64748b;"></span>
+          </div>
+          <div class="policy-result" id="policyResult" style="display:none;"></div>
+        </div>
+
+        <!-- Reconciliation Section -->
+        <div class="recon-section">
+          <h3>Available Payroll Periods</h3>
+          <button class="recon-btn" id="reconFetchPeriods">Fetch Periods</button>
+          <div class="recon-status" id="reconStatus">Click "Fetch Periods" to start.</div>
+          <div id="reconPeriods" style="margin-top:12px;"></div>
+          <div id="reconResults" style="margin-top:16px;"></div>
+        </div>
+
+        <!-- Recon Chat Section -->
+        <div class="recon-section">
+          <h3>Reconciliation Assistant</h3>
+          <div class="recon-chat-box">
+            <div class="recon-chat-messages" id="reconChatMessages">
+              <div style="color:#64748b;font-style:italic;">Ask me about payroll reconciliation, policy rules, or upload a policy to get started.</div>
+            </div>
+            <div class="recon-chat-input">
+              <input type="text" id="reconChatInput" placeholder="Ask about reconciliation..." />
+              <button id="reconChatSend">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('reconFetchPeriods').onclick = fetchReconPeriods;
+    document.getElementById('uploadPolicyBtn').onclick = uploadPolicy;
+    document.getElementById('reconChatSend').onclick = sendReconChat;
+    document.getElementById('reconChatInput').addEventListener('keydown', e => { if (e.key === 'Enter') sendReconChat(); });
+
+    // Show active policy if any
+    updateActivePolicyDisplay();
+  }
+
+  function updateActivePolicyDisplay() {
+    const el = document.getElementById('activePolicyDisplay');
+    if (!el) return;
+    if (activePolicy) {
+      let rulesHtml = '';
+      if (activePolicy.summary) {
+        // Parse the summary to show rule categories
+        const lines = activePolicy.summary.split('\n').filter(l => l.trim());
+        rulesHtml = lines.map(l => {
+          if (l.startsWith('**')) return `<div style="font-weight:600;color:#1e293b;margin-top:6px;font-size:11px;">${escapeHtml(l.replace(/\*\*/g, ''))}</div>`;
+          if (l.startsWith('  -')) return `<div style="font-size:10px;color:#475569;padding-left:8px;">${escapeHtml(l.trim().replace(/^-\s*/, ''))}</div>`;
+          return '';
+        }).join('');
+      }
+      el.innerHTML = `<div class="policy-active" style="flex-direction:column;align-items:flex-start;gap:4px;">
+        <div style="display:flex;align-items:center;gap:8px;width:100%;">
+          <span style="font-size:11px;">Active Policy: <span class="policy-name">${escapeHtml(activePolicy.name)}</span></span>
+          <span style="color:#64748b;font-size:10px;">(${activePolicy.rules_count} rules)</span>
+          <button onclick="window.__clearPolicy()" style="margin-left:auto;font-size:10px;">Remove</button>
+        </div>
+        <div style="max-height:120px;overflow-y:auto;width:100%;padding:4px 0;">${rulesHtml}</div>
+      </div>`;
+    } else {
+      el.innerHTML = '';
+    }
+  }
+
+  window.__clearPolicy = function() {
+    activePolicy = null;
+    updateActivePolicyDisplay();
+  };
+
+  let uploadedPolicyFile = null;
+
+  // File upload handlers
+  const fileDrop = document.getElementById('policyFileDrop');
+  const fileInput = document.getElementById('policyFileInput');
+  if (fileDrop && fileInput) {
+    fileDrop.onclick = () => fileInput.click();
+    fileDrop.ondragover = (e) => { e.preventDefault(); fileDrop.style.borderColor = '#0070F3'; fileDrop.style.background = 'rgba(0,112,243,0.05)'; };
+    fileDrop.ondragleave = () => { fileDrop.style.borderColor = 'rgba(0,112,243,0.3)'; fileDrop.style.background = 'rgba(255,255,255,0.4)'; };
+    fileDrop.ondrop = (e) => {
+      e.preventDefault();
+      fileDrop.style.borderColor = 'rgba(0,112,243,0.3)';
+      fileDrop.style.background = 'rgba(255,255,255,0.4)';
+      if (e.dataTransfer.files.length) handlePolicyFile(e.dataTransfer.files[0]);
+    };
+    fileInput.onchange = (e) => { if (e.target.files.length) handlePolicyFile(e.target.files[0]); };
+  }
+
+  function handlePolicyFile(file) {
+    uploadedPolicyFile = file;
+    const nameEl = document.getElementById('policyFileName');
+    const nameText = document.getElementById('policyFileNameText');
+    if (nameEl && nameText) {
+      nameText.textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+      nameEl.style.display = 'flex';
+    }
+  }
+
+  async function uploadPolicy() {
+    const resultEl = document.getElementById('policyResult');
+    const statusEl = document.getElementById('policyStatus');
+
+    if (!uploadedPolicyFile) {
+      resultEl.style.display = 'block';
+      resultEl.className = 'policy-result error';
+      resultEl.textContent = 'Please select a policy file first.';
+      return;
+    }
+
+    statusEl.innerHTML = '<span class="spinner"></span> Reading file & extracting rules...';
+    resultEl.style.display = 'none';
+
+    try {
+      let fileText = '';
+      const ext = uploadedPolicyFile.name.split('.').pop().toLowerCase();
+
+      if (ext === 'txt') {
+        fileText = await uploadedPolicyFile.text();
+      } else {
+        // For PDF/DOCX, send to backend for extraction
+        const formData = new FormData();
+        formData.append('file', uploadedPolicyFile);
+        const extractR = await fetch(API + '/api/payroll/policy/extract', { method: 'POST', body: formData });
+        const extractD = await extractR.json();
+        if (extractD.status === 'success') {
+          fileText = extractD.policy_text;
+        } else {
+          throw new Error(extractD.detail || 'Failed to extract text from file');
+        }
+      }
+
+      if (!fileText || fileText.trim().length < 10) {
+        throw new Error('Could not extract meaningful text from the file.');
+      }
+
+      // Now parse the extracted text
+      const policyName = uploadedPolicyFile.name.replace(/\.[^.]+$/, '');
+      const r = await fetch(API + '/api/payroll/policy/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ policy_text: fileText, policy_name: policyName })
+      });
+      const d = await r.json();
+      if (d.status === 'success') {
+        activePolicy = { name: policyName, rules_count: d.rules_count, policy_id: d.policy_id, summary: d.summary, raw_text: fileText };
+        resultEl.style.display = 'block';
+        resultEl.className = 'policy-result success';
+        resultEl.textContent = d.summary;
+        statusEl.textContent = 'Policy extracted and uploaded successfully!';
+        updateActivePolicyDisplay();
+      } else {
+        throw new Error(d.detail || 'Failed to parse policy.');
+      }
+    } catch (err) {
+      resultEl.style.display = 'block';
+      resultEl.className = 'policy-result error';
+      resultEl.textContent = 'Error: ' + err.message;
+      statusEl.textContent = '';
+    }
+  }
+
+  async function fetchReconPeriods() {
+    const status = document.getElementById('reconStatus');
+    const periods = document.getElementById('reconPeriods');
+    status.innerHTML = '<span class="spinner"></span> Fetching periods...';
+    try {
+      const r = await fetch(API + '/api/payroll/reconcile/available-periods');
+      const d = await r.json();
+      if (!d.periods || d.periods.length === 0) {
+        status.textContent = 'No payroll periods found.';
+        return;
+      }
+      status.textContent = `Found ${d.periods.length} period(s).`;
+      periods.innerHTML = d.periods.map((p, i) => `
+        <div style="padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px;cursor:pointer;" class="recon-period-card" data-idx="${i}">
+          <div style="font-weight:600;color:#1e293b;">${p.label || p.name || 'Period ' + (i+1)}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:2px;">${p.start_date || ''} — ${p.end_date || ''}</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:2px;">${p.flow_count || 0} payroll flow(s)</div>
+        </div>`).join('');
+      document.querySelectorAll('.recon-period-card').forEach(card => {
+        card.onclick = () => runRecon(d.periods[card.dataset.idx]);
+      });
+    } catch (err) {
+      status.textContent = 'Error: ' + err.message;
+    }
+  }
+
+  async function runRecon(period) {
+    const status = document.getElementById('reconStatus');
+    const results = document.getElementById('reconResults');
+    status.innerHTML = '<span class="spinner"></span> Running reconciliation for ' + (period.label || period.period || '') + '...';
+    results.innerHTML = '';
+    try {
+      const body = {
+        start_date: period.start_date,
+        end_date: period.end_date,
+      };
+      if (activePolicy && activePolicy.raw_text) {
+        body.policy_text = activePolicy.raw_text;
+      }
+      const r = await fetch(API + '/api/payroll/reconcile/oracle-recon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const d = await r.json();
+      if (d.detail) {
+        status.textContent = typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
+        return;
+      }
+      if (d.error) { status.textContent = 'Error: ' + d.error; return; }
+
+      status.textContent = 'Reconciliation complete.';
+
+      // Build results display
+      let html = '';
+      if (d.excel_filename) {
+        html += `<div style="padding:8px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:12px;font-size:11px;color:#1e40af;">
+          Excel report: <b>${escapeHtml(d.excel_filename)}</b>
+        </div>`;
+      }
+
+      // Show summary stats
+      if (d.summary) {
+        html += `<div class="dash-grid" style="margin-bottom:16px;">
+          <div class="dash-card"><div class="card-label">Activity Records</div><div class="card-value">${d.summary.activity_records || '—'}</div></div>
+          <div class="dash-card"><div class="card-label">Costing Records</div><div class="card-value">${d.summary.costing_records || '—'}</div></div>
+          <div class="dash-card"><div class="card-label">Elements Matched</div><div class="card-value" style="color:#22c55e;">${d.summary.elements_matched || '—'}</div></div>
+          <div class="dash-card"><div class="card-label">Elements Mismatched</div><div class="card-value" style="color:#ef4444;">${d.summary.elements_mismatched || '—'}</div></div>
+        </div>`;
+      }
+
+      // Show policy compliance
+      if (d.policy_compliance) {
+        const pc = d.policy_compliance;
+        const scoreColor = pc.compliance_score >= 95 ? '#22c55e' : pc.compliance_score >= 80 ? '#f59e0b' : '#ef4444';
+        const passFail = pc.is_pass ? 'PASS' : 'FAIL';
+        const passColor = pc.is_pass ? '#22c55e' : '#ef4444';
+        html += `<div style="padding:12px;background:${pc.is_pass ? '#f0fdf4' : '#fef2f2'};border:1px solid ${pc.is_pass ? '#bbf7d0' : '#fecaca'};border-radius:10px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span style="font-size:18px;font-weight:700;color:${passColor};">${passFail}</span>
+            <span style="font-size:14px;font-weight:600;color:#1e293b;">Policy Compliance</span>
+          </div>
+          <div style="display:flex;gap:16px;font-size:12px;color:#475569;">
+            <div><b style="color:${scoreColor};">${pc.compliance_score}%</b> score</div>
+            <div><b>${pc.violations}</b> violations</div>
+            <div><b>${pc.employees_with_violations}</b> employees affected</div>
+          </div>
+        </div>`;
+      }
+
+      // Show policy violations table
+      if (d.policy_violations && d.policy_violations.length > 0) {
+        html += `<div style="margin-bottom:12px;">
+          <div style="font-weight:600;font-size:13px;color:#1e293b;margin-bottom:8px;">Policy Violations (${d.policy_violations.length})</div>
+          <table class="recon-table"><thead><tr><th>Employee</th><th>Element</th><th>Rule</th><th>Detail</th></tr></thead><tbody>`;
+        d.policy_violations.slice(0, 50).forEach(v => {
+          html += `<tr style="background:#fef2f2;">
+            <td>${escapeHtml(v.employee || '—')}</td>
+            <td>${escapeHtml(v.element || '—')}</td>
+            <td><span style="font-size:10px;background:#fee2e2;color:#991b1b;padding:1px 5px;border-radius:4px;">${escapeHtml(v.rule_id || '')}</span></td>
+            <td style="font-size:11px;">${escapeHtml(v.description || '—')}</td>
+          </tr>`;
+        });
+        html += `</tbody></table>`;
+        if (d.policy_violations.length > 50) html += `<div class="data-more">Showing 50 of ${d.policy_violations.length} violations</div>`;
+      }
+
+      // Show matched/mismatched elements
+      if (d.reconciliation) {
+        if (d.reconciliation.mismatched_elements && d.reconciliation.mismatched_elements.length > 0) {
+          html += `<div style="margin-bottom:12px;">
+            <div style="font-weight:600;font-size:13px;color:#1e293b;margin-bottom:8px;">Element Differences</div>
+            <table class="recon-table"><thead><tr><th>Element</th><th>Activity</th><th>Costing</th><th>Delta</th></tr></thead><tbody>`;
+          d.reconciliation.mismatched_elements.forEach(me => {
+            html += `<tr>
+              <td>${escapeHtml(me.element || '—')}</td>
+              <td>${me.activity != null ? me.activity.toLocaleString() : '—'}</td>
+              <td>${me.costing != null ? me.costing.toLocaleString() : '—'}</td>
+              <td style="color:${Math.abs(me.delta) > 0.01 ? '#ef4444' : '#22c55e'};font-weight:600;">${me.delta != null ? me.delta.toLocaleString() : '—'}</td>
+            </tr>`;
+          });
+          html += `</tbody></table>`;
+        }
+      }
+      results.innerHTML = html;
+    } catch (err) {
+      status.textContent = 'Error: ' + err.message;
+    }
+  }
+
+  async function sendReconChat() {
+    const input = document.getElementById('reconChatInput');
+    const messages = document.getElementById('reconChatMessages');
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
+
+    // Add user message
+    messages.innerHTML += `<div style="margin-bottom:8px;"><b style="color:#0070F3;">You:</b> ${escapeHtml(msg)}</div>`;
+
+    // Add loading indicator
+    const loadingId = 'loading-' + Date.now();
+    messages.innerHTML += `<div id="${loadingId}" style="margin-bottom:8px;"><b style="color:#00C9A7;">Savvy:</b> <span class="spinner"></span></div>`;
+    messages.scrollTop = messages.scrollHeight;
+
+    try {
+      const body = { message: msg };
+      if (activePolicy) body.policy_text = activePolicy.raw_text;
+      const r = await fetch(API + '/api/enhanced/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const d = await r.json();
+      const loadingEl = document.getElementById(loadingId);
+      if (loadingEl) {
+        loadingEl.innerHTML = `<b style="color:#00C9A7;">Savvy:</b> ${escapeHtml(d.response || d.detail || 'No response')}`;
+      }
+    } catch (err) {
+      const loadingEl = document.getElementById(loadingId);
+      if (loadingEl) {
+        loadingEl.innerHTML = `<b style="color:#00C9A7;">Savvy:</b> <span style="color:#ef4444;">Error: ${escapeHtml(err.message)}</span>`;
+      }
+    }
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function renderBip() {
+    content.innerHTML = `
+      <div class="page">
+        <div class="page-header">
+          <div class="page-title">BIP Reports</div>
+          <div class="page-subtitle">Browse and generate BI Publisher reports</div>
+        </div>
+        <div class="recon-section">
+          <div class="recon-status" id="bipStatus">Connecting to BIP server...</div>
+          <div id="bipContent" style="margin-top:12px;"></div>
+        </div>
+      </div>`;
+    loadBipHealth();
+  }
+
+  async function loadBipHealth() {
+    const status = document.getElementById('bipStatus');
+    const content2 = document.getElementById('bipContent');
+    try {
+      const r = await fetch(BIP + '/health');
+      const d = await r.json();
+      status.textContent = 'BIP server connected.';
+      content2.innerHTML = `<div class="dash-grid">
+        <div class="dash-card"><div class="card-label">Status</div><div class="card-value" style="color:#22c55e;">Online</div></div>
+        <div class="dash-card"><div class="card-label">Version</div><div class="card-value">${d.version || '—'}</div></div>
+      </div>
+      <div style="margin-top:16px;">
+        <button class="recon-btn" onclick="window.open('${BIP}','_blank')">Open BIP Dashboard</button>
+      </div>`;
+    } catch {
+      status.textContent = 'BIP server not reachable.';
+    }
+  }
+
+  function renderAnalytics() {
+    content.innerHTML = `
+      <div class="page">
+        <div class="page-header">
+          <div class="page-title">Analytics</div>
+          <div class="page-subtitle">Oracle HCM analytics dashboard</div>
+        </div>
+        <div class="recon-section">
+          <div class="recon-status">Analytics data requires Oracle HCM Analytics access.</div>
+          <div style="margin-top:16px;">
+            <button class="recon-btn" onclick="window.savvy.openExternal('https://analytics.oraclecloud.com')">Open Oracle Analytics</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // Nav icon click handlers
+  document.getElementById('navDashboard').onclick = () => expandTo('dashboard');
+  document.getElementById('navRecon').onclick = () => expandTo('reconciliation');
+  document.getElementById('navBip').onclick = () => expandTo('bip');
+  document.getElementById('navAnalytics').onclick = () => expandTo('analytics');
+
+  // Sidebar nav click handlers
+  document.querySelectorAll('.sidebar-nav-item').forEach(el => {
+    el.onclick = () => {
+      const page = el.dataset.page;
+      if (page === 'chat') { collapseToChat(); return; }
+      renderPage(page);
+      setActiveNav(page);
+    };
+  });
+})();
+</script>
 <script src="renderer.bundle.js"></script>
 </body>
 </html>

@@ -752,7 +752,7 @@ CRITICAL RULES:
         <b>${escapeHtml(p.displayName)}</b>${p.department ? ' &middot; ' + escapeHtml(p.department) : ''}${p.job ? ' &middot; ' + escapeHtml(p.job) : ''}
       </button>`
     ).join('');
-    chooseDiv.innerHTML = `<div class="msg-avatar">EQ</div><div class="msg-text"><div style="margin-bottom:6px;">${escapeHtml(fetchedData.text)}</div>${buttonsHtml}</div>`;
+    chooseDiv.innerHTML = `<div class="msg-avatar"><img src="../assets/logo-chat-icon.png" alt="EQInt" style="width:100%;height:100%;object-fit:contain;" /></div><div class="msg-text"><div style="margin-bottom:6px;">${escapeHtml(fetchedData.text)}</div>${buttonsHtml}</div>`;
     container.appendChild(chooseDiv);
     container.scrollTop = container.scrollHeight;
 
@@ -785,7 +785,7 @@ CRITICAL RULES:
           if (html) {
             const dataDiv = document.createElement('div');
             dataDiv.className = 'msg bot';
-            dataDiv.innerHTML = `<div class="msg-avatar">EQ</div><div class="msg-text">${html}</div>`;
+            dataDiv.innerHTML = `<div class="msg-avatar"><img src="../assets/logo-chat-icon.png" alt="EQInt" style="width:100%;height:100%;object-fit:contain;" /></div><div class="msg-text">${html}</div>`;
             container.appendChild(dataDiv);
           }
           const note = 'Everything shown above is on file in the system — nothing more is available right now.';
@@ -830,7 +830,7 @@ CRITICAL RULES:
     const container = document.getElementById('messages');
     const denyDiv = document.createElement('div');
     denyDiv.className = 'msg bot';
-    denyDiv.innerHTML = `<div class="msg-avatar">EQ</div><div class="msg-text" style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;">${escapeHtml(fetchedData.text)}</div>`;
+    denyDiv.innerHTML = `<div class="msg-avatar"><img src="../assets/logo-chat-icon.png" alt="EQInt" style="width:100%;height:100%;object-fit:contain;" /></div><div class="msg-text" style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;">${escapeHtml(fetchedData.text)}</div>`;
     container.appendChild(denyDiv);
     container.scrollTop = container.scrollHeight;
     return;
@@ -910,7 +910,7 @@ CRITICAL RULES:
   if (htmlSections) {
     const dataDiv = document.createElement('div');
     dataDiv.className = 'msg bot';
-    dataDiv.innerHTML = `<div class="msg-avatar">EQ</div><div class="msg-text">${htmlSections}</div>`;
+    dataDiv.innerHTML = `<div class="msg-avatar"><img src="../assets/logo-chat-icon.png" alt="EQInt" style="width:100%;height:100%;object-fit:contain;" /></div><div class="msg-text">${htmlSections}</div>`;
     container.appendChild(dataDiv);
     container.scrollTop = container.scrollHeight;
 
@@ -1313,11 +1313,12 @@ function addMessage(text, who) {
   const container = document.getElementById('messages');
   const div = document.createElement('div');
   div.className = 'msg ' + who;
-  const avatar = who === 'bot' ? 'EQ' : 'You';
+  const botAvatar = '<img src="../assets/logo-chat-icon.png" alt="EQInt" style="width:100%;height:100%;object-fit:contain;" />';
+  const userAvatar = 'You';
   if (who === 'bot') {
-    div.innerHTML = `<div class="msg-avatar">${avatar}</div><div class="msg-text">${text ? formatMarkdown(text) : ''}</div>`;
+    div.innerHTML = `<div class="msg-avatar">${botAvatar}</div><div class="msg-text">${text ? formatMarkdown(text) : ''}</div>`;
   } else {
-    div.innerHTML = `<div class="msg-avatar">${avatar}</div><div class="msg-text">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+    div.innerHTML = `<div class="msg-avatar">${userAvatar}</div><div class="msg-text">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
   }
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
@@ -1442,7 +1443,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       img.style.display = 'none';
       const span = document.createElement('span');
       span.style.cssText = `font-weight:700;font-size:${img.dataset.fallbackSize};color:${img.dataset.fallbackColor};`;
-      span.textContent = 'EQ';
+      span.textContent = 'EQInt';
       img.parentNode.appendChild(span);
     });
   });
